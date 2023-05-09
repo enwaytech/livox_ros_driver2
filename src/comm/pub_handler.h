@@ -122,7 +122,6 @@ class PubHandler {
   
   static bool GetLidarId(LidarProtoType lidar_type, uint32_t handle, uint32_t& id);
   static uint64_t GetEthPacketTimestamp(uint8_t timestamp_type, uint8_t* time_stamp, uint8_t size);
-  static uint64_t GetDirectEthPacketTimestamp(uint8_t timestamp_type, uint8_t* time_stamp, uint8_t size);
 
   PointCloudsCallback points_callback_;
   void* pub_client_data_ = nullptr;

@@ -162,6 +162,7 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
     self->raw_packet_queue_.push_back(packet);
   }
     self->packet_condition_.notify_one();
+  }
 
   return;
 }
@@ -197,6 +198,7 @@ void PubHandler::CheckTimer(uint32_t id) {
     PointPacket& lidar_point = frame_.lidar_point[frame_.lidar_num];
     lidar_point.lidar_type = LidarProtoType::kLivoxLidarType;  // TODO:
     lidar_point.handle = id;
+
     lidar_point.points_num = points_[id].size();
     lidar_point.points = points_[id].data();
     frame_.lidar_num++;
