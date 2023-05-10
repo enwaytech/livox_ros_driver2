@@ -77,6 +77,7 @@ class PubHandler {
  public:
   using PointCloudsCallback = std::function<void(PointFrame*, void *)>;
   using ImuDataCallback = std::function<void(ImuData*, void*)>;
+  using PacketCallback = std::function<void(RawPacketData*, void*)>;
   using TimePoint = std::chrono::high_resolution_clock::time_point;
 
   PubHandler() {}
@@ -90,6 +91,7 @@ class PubHandler {
   void SetPointCloudsCallback(PointCloudsCallback cb, void* client_data);
   void AddLidarsExtParam(LidarExtParameter& extrinsic_params);
   void ClearAllLidarsExtrinsicParams();
+  void SetPacketCallback(PacketCallback cb, void* client_data);
   void SetImuDataCallback(ImuDataCallback cb, void* client_data);
 
  private:
@@ -103,6 +105,7 @@ class PubHandler {
   //publish callback
   void CheckTimer();
   void PublishPointCloud();
+  void PublishPacket(RawPacket *packet);
   static void OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t dev_type,
                                              LivoxLidarEthernetPacket *data, void *client_data);
   
@@ -115,6 +118,9 @@ class PubHandler {
 
   ImuDataCallback imu_callback_;
   void* imu_client_data_ = nullptr;
+
+  PacketCallback packet_callback_;
+  void* packet_client_data_ = nullptr;
 
   PointFrame frame_;
 

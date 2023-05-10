@@ -43,10 +43,12 @@ class DriverNode final : public ros::NodeHandle {
 
   void PointCloudDataPollThread();
   void ImuDataPollThread();
+  void PacketPollThread();
 
   std::unique_ptr<Lddc> lddc_ptr_;
   std::shared_ptr<std::thread> pointclouddata_poll_thread_;
   std::shared_ptr<std::thread> imudata_poll_thread_;
+  std::shared_ptr<std::thread> packet_poll_thread_;
   std::shared_future<void> future_;
   std::promise<void> exit_signal_;
 };
@@ -68,6 +70,7 @@ class DriverNode final : public rclcpp::Node {
   std::unique_ptr<Lddc> lddc_ptr_;
   std::shared_ptr<std::thread> pointclouddata_poll_thread_;
   std::shared_ptr<std::thread> imudata_poll_thread_;
+  std::shared_ptr<std::thread> packet_poll_thread_;
   std::shared_future<void> future_;
   std::promise<void> exit_signal_;
 };

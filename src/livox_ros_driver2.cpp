@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
 
   livox_node.pointclouddata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PointCloudDataPollThread, &livox_node);
   livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
+  livox_node.packet_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PacketPollThread, &livox_node);
   while (ros::ok()) { usleep(10000); }
 
   return 0;
@@ -214,10 +215,15 @@ void DriverNode::ImuDataPollThread()
   } while (status == std::future_status::timeout);
 }
 
-
-
-
-
+void DriverNode::PacketPollThread()
+{
+  std::future_status status;
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  do {
+    lddc_ptr_->DistributePacketData();
+    status = future_.wait_for(std::chrono::microseconds(0));
+  } while (status == std::future_status::timeout);
+}
 
 
 

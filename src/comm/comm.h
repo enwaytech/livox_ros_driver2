@@ -37,7 +37,7 @@
 #include <map>
 
 #include "lidar_imu_data_queue.h"
-
+#include "lidar_packet_data_queue.h"
 namespace livox_ros {
 
 /** Max lidar data source num */
@@ -284,6 +284,7 @@ typedef struct {
 
   LidarDataQueue data;
   LidarImuDataQueue imu_data;
+  LidarPacketDataQueue packet_data;
 
   uint32_t firmware_ver; /**< Firmware version of lidar  */
   UserLivoxLidarConfig livox_config;

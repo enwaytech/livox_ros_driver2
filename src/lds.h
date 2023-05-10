@@ -43,6 +43,7 @@ class Lds {
   virtual ~Lds();
 
   void StorageImuData(ImuData* imu_data);
+  void StoragePacketData(RawPacketData* packet);
   void StoragePointData(PointFrame* frame);
   void StorageLvxPointData(PointFrame* frame);
 
@@ -70,6 +71,7 @@ class Lds {
   LidarDevice lidars_[kMaxSourceLidar]; /**< The index is the handle */
   Semaphore pcd_semaphore_;
   Semaphore imu_semaphore_;
+  Semaphore packet_semaphore_;
   static CacheIndex cache_index_;
  protected:
   double publish_freq_;

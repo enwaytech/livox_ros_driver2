@@ -45,6 +45,7 @@ typedef enum {
   kLivoxCustomMsg = 1,
   kPclPxyziMsg = 2,
   kLivoxImuMsg = 3,
+  kLivoxPacketMsg = 4,
 } TransferType;
 
 /** Type-Definitions based on ROS versions */
@@ -56,6 +57,7 @@ using PointField = sensor_msgs::PointField;
 using CustomMsg = livox_ros_driver2::CustomMsg;
 using CustomPoint = livox_ros_driver2::CustomPoint;
 using ImuMsg = sensor_msgs::Imu;
+using PacketMsg = livox_ros_driver2::PacketMsg;
 #elif defined BUILDING_ROS2
 template <typename MessageT> using Publisher = rclcpp::Publisher<MessageT>;
 using PublisherPtr = std::shared_ptr<rclcpp::PublisherBase>;
@@ -84,6 +86,7 @@ class Lddc final {
   int RegisterLds(Lds *lds);
   void DistributePointCloudData(void);
   void DistributeImuData(void);
+  void DistributePacketData(void);
   void CreateBagFile(const std::string &file_name);
   void PrepareExit(void);
 
@@ -100,11 +103,13 @@ class Lddc final {
  private:
   void PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar);
   void PollingLidarImuData(uint8_t index, LidarDevice *lidar);
+  void PollingLidarPacketData(uint8_t index, LidarDevice *lidar);
 
   void PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
 
+  void PublishPacketData(LidarPacketDataQueue& packet_data_queue, const uint8_t index, const std::string& frame_id);
   void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& frame_id);
 
   void InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id);
@@ -120,6 +125,7 @@ class Lddc final {
   void PublishPclData(const uint8_t index, const uint64_t timestamp, const PointCloud& cloud);
 
   void InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, const std::string& frame_id);
+  void InitPacketMsg(const RawPacketData& packet_data, PacketMsg& packet_msg, uint64_t& timestamp, const std::string& frame_id);
 
   void FillPointsToPclMsg(PointCloud& pcl_msg, LivoxPointXyzrtl* src_point, uint32_t num);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, LivoxPointXyzrtl* src_point, uint32_t num,
@@ -131,6 +137,8 @@ class Lddc final {
 
   PublisherPtr GetCurrentPublisher(uint8_t index);
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
+  PublisherPtr GetCurrentPacketPublisher(uint8_t handle);
+
 
  private:
   uint8_t transfer_format_;
@@ -148,6 +156,8 @@ class Lddc final {
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
+  PublisherPtr private_packet_pub_[kMaxSourceLidar];
+  PublisherPtr global_packet_pub_;
   rosbag::Bag *bag_;
 #elif defined BUILDING_ROS2
   PublisherPtr private_pub_[kMaxSourceLidar];

@@ -55,8 +55,10 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
   memset(private_imu_pub_, 0, sizeof(private_imu_pub_));
+  memset(private_packet_pub_, 0, sizeof(private_packet_pub_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
+  global_packet_pub_ = nullptr;
   cur_node_ = nullptr;
   bag_ = nullptr;
 }
@@ -86,6 +88,10 @@ Lddc::~Lddc() {
   if (global_imu_pub_) {
     delete global_imu_pub_;
   }
+
+  if (global_packet_pub_) {
+    delete global_packet_pub_;
+  }
 #endif
 
   PrepareExit();
@@ -100,6 +106,12 @@ Lddc::~Lddc() {
   for (uint32_t i = 0; i < kMaxSourceLidar; i++) {
     if (private_imu_pub_[i]) {
       delete private_imu_pub_[i];
+    }
+  }
+
+  for (uint32_t i = 0; i < kMaxSourceLidar; i++) {
+    if (private_packet_pub_[i]) {
+      delete private_packet_pub_[i];
     }
   }
 #endif
@@ -159,6 +171,28 @@ void Lddc::DistributeImuData(void) {
   }
 }
 
+void Lddc::DistributePacketData(void) {
+  if (!lds_) {
+    std::cout << "lds is not registered" << std::endl;
+    return;
+  }
+  if (lds_->IsRequestExit()) {
+    std::cout << "DistributeImuData is RequestExit" << std::endl;
+    return;
+  }
+  
+  lds_->packet_semaphore_.Wait();
+  for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
+    uint32_t lidar_id = i;
+    LidarDevice *lidar = &lds_->lidars_[lidar_id];
+    LidarPacketDataQueue *p_queue = &lidar->packet_data;
+    if ((kConnectStateSampling != lidar->connect_state) || (p_queue == nullptr)) {
+      continue;
+    }
+    PollingLidarPacketData(lidar_id, lidar);
+  }
+}
+
 void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
   LidarDataQueue *p_queue = &lidar->data;
   if (p_queue == nullptr || p_queue->storage_packet == nullptr) {
@@ -180,6 +214,13 @@ void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
     PublishImuData(p_queue, index, lidar->livox_config.frame_id);
+  }
+}
+
+void Lddc::PollingLidarPacketData(uint8_t index, LidarDevice *lidar) {
+  LidarPacketDataQueue& p_queue = lidar->packet_data;
+  while (!lds_->IsRequestExit() && !p_queue.Empty()) {
+    PublishPacketData(p_queue, index, lidar->livox_config.frame_id);
   }
 }
 
@@ -491,6 +532,45 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.linear_acceleration.z = imu_data.acc_z;
 }
 
+void Lddc::InitPacketMsg(const RawPacketData& packet_data, PacketMsg& packet_msg, uint64_t& timestamp, const std::string& frame_id) {
+  //packet_msg.header.frame_id = frame_id;
+  timestamp = packet_data.time_stamp;
+  packet_msg.lidar_type = packet_data.lidar_type;
+  packet_msg.handle = packet_data.handle;
+  packet_msg.extrinsic_enable = packet_data.extrinsic_enable;
+  packet_msg.point_num = packet_data.point_num; //96
+  packet_msg.data_type = packet_data.data_type; //1
+  packet_msg.line_num = packet_data.line_num; //4
+  packet_msg.time_stamp = packet_data.time_stamp;
+  packet_msg.point_interval = packet_data.point_interval; //4947
+  packet_msg.raw_data = packet_data.raw_data;
+}
+
+void Lddc::PublishPacketData(LidarPacketDataQueue& packet_data_queue, const uint8_t index, const std::string& frame_id) {
+  RawPacketData packet_data;
+  if (!packet_data_queue.Pop(packet_data)) {
+    //printf("Publish imu data failed, imu data queue pop failed.\n");
+    return;
+  }
+
+  PacketMsg packet_msg;
+
+  uint64_t timestamp;
+  InitPacketMsg(packet_data, packet_msg, timestamp, frame_id);
+  PublisherPtr publisher_ptr = GetCurrentPacketPublisher(index);
+
+  if (kOutputToRos == output_type_) {
+    //DRIVER_ERROR(*cur_node_, "Publish Packet Msg\n");
+    publisher_ptr->publish(packet_msg);
+  }
+#if 0
+  } else {
+    if (bag_ && enable_imu_bag_) {
+      bag_->write(publisher_ptr->getTopic(), ros::Time(timestamp / 1000000000.0), packet_msg);
+    }
+  }
+#endif
+}
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& frame_id) {
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
@@ -542,6 +622,12 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
       DRIVER_INFO(*cur_node_,
           "%s publish use imu format", topic_name.c_str());
       return cur_node_->create_publisher<ImuMsg>(topic_name,
+          queue_size);
+    }
+    else if (kLivoxPacketMsg == msg_type)  {
+      DRIVER_INFO(*cur_node_,
+          "%s publish use packet format", topic_name.c_str());
+      return cur_node_->create_publisher<PacketMsg>(topic_name,
           queue_size);
     } else {
       PublisherPtr null_publisher(nullptr);
@@ -628,6 +714,40 @@ PublisherPtr Lddc::GetCurrentImuPublisher(uint8_t handle) {
 
     *pub = new ros::Publisher;
     **pub = cur_node_->GetNode().advertise<sensor_msgs::Imu>(name_str, queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish imu data, set ROS publisher queue size %d", name_str,
+             queue_size);
+  }
+
+  return *pub;
+}
+
+PublisherPtr Lddc::GetCurrentPacketPublisher(uint8_t handle) {
+  ros::Publisher **pub = nullptr;
+  uint32_t queue_size = kMinEthPacketQueueSize;
+
+  if (use_multi_topic_) {
+    pub = &private_packet_pub_[handle];
+    queue_size = queue_size * 2; // queue size is 64 for only one lidar
+  } else {
+    pub = &global_packet_pub_;
+    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+  }
+
+  if (*pub == nullptr) {
+    char name_str[48];
+    memset(name_str, 0, sizeof(name_str));
+    if (use_multi_topic_) {
+      DRIVER_INFO(*cur_node_, "Support multi topics.");
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/packet_%s",
+               ReplacePeriodByUnderline(ip_string).c_str());
+    } else {
+      DRIVER_INFO(*cur_node_, "Support only one topic.");
+      snprintf(name_str, sizeof(name_str), "livox/packet");
+    }
+
+    *pub = new ros::Publisher;
+    **pub = cur_node_->GetNode().advertise<livox_ros_driver2::PacketMsg>(name_str, queue_size);
     DRIVER_INFO(*cur_node_, "%s publish imu data, set ROS publisher queue size %d", name_str,
              queue_size);
   }

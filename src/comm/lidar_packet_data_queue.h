@@ -22,20 +22,41 @@
 // SOFTWARE.
 //
 
-#ifndef LIVOX_ROS_DRIVER_LIDAR_COMMON_CALLBACK_H_
-#define LIVOX_ROS_DRIVER_LIDAR_COMMON_CALLBACK_H_	
+#ifndef LIVOX_ROS_DRIVER_LIDAR_PACKET_DATA_QUEUE_H_
+#define LIVOX_ROS_DRIVER_LIDAR_PACKET_DATA_QUEUE_H_
 
-#include "comm/comm.h"
+#include <list>
+#include <mutex>
+#include <cstdint>
+#include <vector>
 
 namespace livox_ros {
 
-class LidarCommonCallback {
+typedef struct {
+  uint8_t lidar_type;
+  uint32_t handle;
+  bool extrinsic_enable;
+  uint32_t point_num;
+  uint8_t data_type;
+  uint8_t line_num;
+  uint64_t time_stamp;
+  uint64_t point_interval;
+  std::vector<uint8_t> raw_data;
+} RawPacketData;
+
+class LidarPacketDataQueue {
  public:
-  static void OnLidarPointClounCb(PointFrame* frame, void* client_data);
-  static void LidarImuDataCallback(ImuData* imu_data, void *client_data);
-  static void LidarPacketCallback(RawPacketData* packet_data, void *client_data);
+  void Push(RawPacketData* packet_data);
+  bool Pop(RawPacketData& packet_data);
+  bool Empty();
+  void Clear();
+
+ private:
+  std::mutex mutex_;
+  std::list<RawPacketData> packet_data_queue_;
 };
 
-} // namespace livox_ros
+} // namespace
 
-#endif // LIVOX_ROS_DRIVER_LIDAR_COMMON_CALLBACK_H_
+#endif // LIVOX_ROS_DRIVER_LIDAR_PACKET_DATA_QUEUE_H_
+

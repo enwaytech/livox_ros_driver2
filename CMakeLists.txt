@@ -45,6 +45,7 @@ find_package(PCL REQUIRED)
 add_message_files(FILES
   CustomPoint.msg
   CustomMsg.msg
+  PacketMsg.msg
 #   Message2.msg
 )
 
@@ -129,6 +130,7 @@ target_sources(${PROJECT_NAME}_node
   src/comm/ldq.cpp
   src/comm/semaphore.cpp
   src/comm/lidar_imu_data_queue.cpp
+  src/comm/lidar_packet_data_queue.cpp
   src/comm/cache_index.cpp
   src/comm/pub_handler.cpp
 

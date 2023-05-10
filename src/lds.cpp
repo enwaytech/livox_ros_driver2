@@ -122,6 +122,32 @@ void Lds::StorageImuData(ImuData* imu_data) {
   }
 }
 
+void Lds::StoragePacketData(RawPacketData* packet) {
+  uint32_t device_num = 0;
+  if (packet->lidar_type == kLivoxLidarType) {
+    device_num = packet->handle;
+  } else {
+    printf("Storage packet data failed, unknown lidar type:%u.\n", packet->lidar_type);
+    return;
+  }
+
+  uint8_t index = 0;
+  int ret = cache_index_.GetIndex(packet->lidar_type, device_num, index);
+  if (ret != 0) {
+    printf("Storage packet data failed, can not get index, lidar type:%u, device_num:%u.\n", packet->lidar_type, device_num);
+    return;
+  }
+
+  LidarDevice *p_lidar = &lidars_[index];
+  LidarPacketDataQueue* packet_queue = &p_lidar->packet_data;
+  packet_queue->Push(packet);
+  if (!packet_queue->Empty()) {
+    if (packet_semaphore_.GetCount() <= 0) {
+      packet_semaphore_.Signal();
+    }
+  }
+}
+
 void Lds::StorageLvxPointData(PointFrame* frame) {
   if (frame == nullptr) {
     return;

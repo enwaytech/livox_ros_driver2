@@ -37,6 +37,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include "livox_ros_driver2/CustomMsg.h"
 #include "livox_ros_driver2/CustomPoint.h"
+#include "livox_ros_driver2/PacketMsg.h"
 
 
 #define DRIVER_DEBUG(node, ...) ROS_DEBUG(__VA_ARGS__)

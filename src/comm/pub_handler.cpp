@@ -84,10 +84,34 @@ void PubHandler::ClearAllLidarsExtrinsicParams() {
   lidar_extrinsics_.clear();
 }
 
+void PubHandler::SetPacketCallback(PacketCallback cb, void* client_data) {
+  packet_client_data_ = client_data;
+  packet_callback_ = cb;
+}
+
 void PubHandler::SetPointCloudsCallback(PointCloudsCallback cb, void* client_data) {
   pub_client_data_ = client_data;
   points_callback_ = cb;
   lidar_listen_id_ = LivoxLidarAddPointCloudObserver(OnLivoxLidarPointCloudCallback, this);
+}
+
+void PubHandler::PublishPacket(RawPacket *packet)
+{
+  if (packet_callback_)
+  {
+    RawPacketData data;
+    data.lidar_type = packet->lidar_type;
+    data.handle = packet->handle;
+    data.extrinsic_enable = packet->extrinsic_enable;
+    data.point_num = packet->point_num;
+    data.data_type = packet->data_type;
+    data.line_num = packet->line_num;
+    data.time_stamp = packet->time_stamp;
+    data.point_interval = packet->point_interval;
+    data.raw_data = packet->raw_data;
+
+    packet_callback_(&data, packet_client_data_);
+  }
 }
 
 void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t dev_type,
@@ -139,6 +163,8 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
     self->packet_condition_.notify_one();
   }
 
+  // call packet callback
+  self->PublishPacket(&packet);
   return;
 }
 
