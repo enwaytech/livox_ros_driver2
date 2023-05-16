@@ -42,7 +42,6 @@
 #endif // WIN32
 
 #include "comm/comm.h"
-#include "comm/pub_handler.h"
 
 #include "parse_cfg_file/parse_cfg_file.h"
 #include "parse_cfg_file/parse_livox_lidar_cfg.h"
@@ -211,5 +210,9 @@ int LdsLidar::DeInitLdsLidar(void) {
 }
 
 void LdsLidar::PrepareExit(void) { DeInitLdsLidar(); }
+
+PubHandler* LdsLidar::GetPubHandler(void) {
+  return &pub_handler();
+}
 
 }  // namespace livox_ros

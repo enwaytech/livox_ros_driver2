@@ -93,6 +93,7 @@ class PubHandler {
   void ClearAllLidarsExtrinsicParams();
   void SetPacketCallback(PacketCallback cb, void* client_data);
   void SetImuDataCallback(ImuDataCallback cb, void* client_data);
+  void AddPackage(RawPacket *packet);
 
  private:
   //thread to process raw data

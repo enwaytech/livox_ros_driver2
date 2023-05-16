@@ -68,7 +68,6 @@ void LidarCommonCallback::LidarImuDataCallback(ImuData* imu_data, void *client_d
 }
 
 void LidarCommonCallback::LidarPacketCallback(RawPacketData* packet_data, void *client_data) {
-  // TODO Georg:
   //std::cout << "Received a new lidar packet callback" << std::endl;
   if (packet_data == nullptr) {
     printf("Packet data is nullptr.\n");

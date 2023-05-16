@@ -26,7 +26,7 @@
 #define LIVOX_ROS_DRIVER2_LDDC_H_
 
 #include "include/livox_ros_driver2.h"
-
+#include "comm/pub_handler.h"
 #include "driver_node.h"
 #include "lds.h"
 #include <string>
@@ -93,7 +93,8 @@ class Lddc final {
   uint8_t GetTransferFormat(void) { return transfer_format_; }
   uint8_t IsMultiTopic(void) { return use_multi_topic_; }
   void SetRosNode(livox_ros::DriverNode *node) { cur_node_ = node; }
-
+  void SetPubHandler(livox_ros::PubHandler *pub_handler);
+  void SetRosSubscriber(const std::string topic);
   // void SetRosPub(ros::Publisher *pub) { global_pub_ = pub; };  // NOT USED
   void SetPublishFrq(uint32_t frq) { publish_frq_ = frq; }
 
@@ -138,7 +139,7 @@ class Lddc final {
   PublisherPtr GetCurrentPublisher(uint8_t index);
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
   PublisherPtr GetCurrentPacketPublisher(uint8_t handle);
-
+  void PackageCallback(const PacketMsg& packet);
 
  private:
   uint8_t transfer_format_;
@@ -159,6 +160,8 @@ class Lddc final {
   PublisherPtr private_packet_pub_[kMaxSourceLidar];
   PublisherPtr global_packet_pub_;
   rosbag::Bag *bag_;
+  ros::Subscriber ros_sub_;
+  PubHandler *pub_handler_;
 #elif defined BUILDING_ROS2
   PublisherPtr private_pub_[kMaxSourceLidar];
   PublisherPtr global_pub_;

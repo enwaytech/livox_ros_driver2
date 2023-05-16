@@ -111,7 +111,8 @@ typedef enum {
 typedef enum {
   kSourceRawLidar = 0, /**< Data from raw lidar. */
   kSourceRawHub = 1,   /**< Data from lidar hub. */
-  kSourceLvxFile,      /**< Data from parse lvx file. */
+  kSourceLvxFile = 2,  /**< Data from parse lvx file. */
+  kSourceRosTopic = 3, /**< Data from rostopic */
   kSourceUndef,
 } LidarDataSourceType;
 

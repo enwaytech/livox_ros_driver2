@@ -61,6 +61,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
   global_packet_pub_ = nullptr;
   cur_node_ = nullptr;
   bag_ = nullptr;
+  pub_handler_ = nullptr;
 }
 #elif defined BUILDING_ROS2
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
@@ -236,6 +237,49 @@ void Lddc::PrepareExit(void) {
   if (lds_) {
     lds_->PrepareExit();
     lds_ = nullptr;
+  }
+}
+
+void Lddc::SetPubHandler(livox_ros::PubHandler *pub_handler)
+{
+  DRIVER_INFO(*cur_node_, "Set pub handler\n");
+  pub_handler_ = pub_handler;
+}
+
+void Lddc::SetRosSubscriber(const std::string topic)
+{
+  DRIVER_INFO(*cur_node_, "Subscribe to rostopic %s\n", topic.c_str());
+  ros_sub_ = cur_node_->subscribe(topic, 1, &Lddc::PackageCallback, this);
+}
+
+void Lddc::PackageCallback(const PacketMsg& packet)
+{
+  DRIVER_INFO(*cur_node_, "Received new packet\n");
+  // search lds pub handler for topic? or how do distinquish between packets?
+  //lds_->packet_semaphore_.Wait();
+  for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
+    uint32_t lidar_id = i;
+    LidarDevice *lidar = &lds_->lidars_[lidar_id];
+    std::string frame_id {"front_left"};
+    if (lidar->livox_config.frame_id == frame_id)
+    {
+      DRIVER_INFO(*cur_node_, "Found Sensor with frame %s", frame_id.c_str());
+      RawPacket raw_packet = {};
+      raw_packet.handle = packet.handle;
+      raw_packet.lidar_type = static_cast<LidarProtoType>(packet.lidar_type);
+      raw_packet.extrinsic_enable = packet.extrinsic_enable;
+      raw_packet.point_num = packet.point_num;
+      raw_packet.data_type = packet.data_type;
+      raw_packet.line_num = packet.line_num;
+      raw_packet.time_stamp = packet.time_stamp;
+      raw_packet.point_interval = packet.point_interval;
+      raw_packet.raw_data = packet.raw_data;
+      pub_handler_->AddPackage(&raw_packet);
+    }
+    else
+    {
+      //DRIVER_INFO(*cur_node_, "Sensor has frame %s", lidar->livox_config.frame_id.c_str());
+    }
   }
 }
 

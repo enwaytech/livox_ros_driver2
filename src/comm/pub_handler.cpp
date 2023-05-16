@@ -114,6 +114,20 @@ void PubHandler::PublishPacket(RawPacket *packet)
   }
 }
 
+void PubHandler::AddPackage(RawPacket *packet)
+{
+  std::cout << "AddPackage called" << std::endl;
+  std::unique_lock<std::mutex> lock(packet_mutex_);
+  raw_packet_queue_.push_back(*packet);
+  packet_condition_.notify_one();
+}
+#if 0
+void PubHandler::PublishPacketMsg(RawPacket *packet)
+{
+
+}
+#endif
+
 void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t dev_type,
                                                 LivoxLidarEthernetPacket *data, void *client_data) {
   PubHandler* self = (PubHandler*)client_data;

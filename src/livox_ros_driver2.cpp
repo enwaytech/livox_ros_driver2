@@ -36,7 +36,7 @@
 
 using namespace livox_ros;
 
-#ifdef BUILDING_ROS1
+//#ifdef BUILDING_ROS1
 int main(int argc, char **argv) {
   /** Ros related */
   if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   /** Init default system parameter */
   int xfer_format = kPointCloud2Msg;
   int multi_topic = 0;
-  int data_src = kSourceRawLidar;
+  int data_src = kSourceRosTopic;
   double publish_freq  = 10.0; /* Hz */
   int output_type      = kOutputToRos;
   std::string frame_id = "livox_frame";
@@ -102,6 +102,25 @@ int main(int argc, char **argv) {
     } else {
       DRIVER_ERROR(livox_node, "Init lds lidar failed!");
     }
+  }
+  else if (data_src == kSourceRosTopic)
+  {
+    std::string user_config_path;
+    nh.getParam("user_config_path", user_config_path);
+    DRIVER_INFO(livox_node, "Config file : %s", user_config_path.c_str());
+
+    LdsLidar *read_lidar = LdsLidar::GetInstance(publish_freq);
+    DRIVER_INFO(livox_node, "Data Source is from rostopic.");
+    livox_node.lddc_ptr_->SetPubHandler(read_lidar->GetPubHandler());
+    livox_node.lddc_ptr_->SetRosSubscriber("/sensors/lidar/front_left/packets");
+
+    livox_node.lddc_ptr_->RegisterLds(static_cast<Lds *>(read_lidar));
+    /*if ((read_lidar->InitLdsLidar(user_config_path))) {
+      DRIVER_INFO(livox_node, "Init lds lidar successfully!");
+    } else {
+      DRIVER_ERROR(livox_node, "Init lds lidar failed!");
+    }*/
+  
   } else {
     DRIVER_ERROR(livox_node, "Invalid data src (%d), please check the launch file", data_src);
   }
@@ -109,12 +128,12 @@ int main(int argc, char **argv) {
   livox_node.pointclouddata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PointCloudDataPollThread, &livox_node);
   livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
   livox_node.packet_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PacketPollThread, &livox_node);
-  while (ros::ok()) { usleep(10000); }
+  while (ros::ok()) { ros::spinOnce(); usleep(10000); }
 
   return 0;
 }
 
-#elif defined BUILDING_ROS2
+#if 0 //defined BUILDING_ROS2
 namespace livox_ros
 {
 DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
