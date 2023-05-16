@@ -144,7 +144,10 @@ void Lddc::DistributePointCloudData(void) {
     LidarDevice *lidar = &lds_->lidars_[lidar_id];
     LidarDataQueue *p_queue = &lidar->data;
     if ((kConnectStateSampling != lidar->connect_state) || (p_queue == nullptr)) {
-      continue;
+      if (i != 0)
+      {
+        continue;
+      }
     }
     PollingLidarPointCloudData(lidar_id, lidar);    
   }
@@ -199,8 +202,8 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
   if (p_queue == nullptr || p_queue->storage_packet == nullptr) {
     return;
   }
-
   while (!lds_->IsRequestExit() && !QueueIsEmpty(p_queue)) {
+    std::cout << "PollingLidarPointCloudData" << std::endl;
     if (kPointCloud2Msg == transfer_format_) {
       PublishPointcloud2(p_queue, index, lidar->livox_config.frame_id);
     } else if (kLivoxCustomMsg == transfer_format_) {
@@ -261,7 +264,7 @@ void Lddc::PackageCallback(const PacketMsg& packet)
     uint32_t lidar_id = i;
     LidarDevice *lidar = &lds_->lidars_[lidar_id];
     std::string frame_id {"front_left"};
-    if (lidar->livox_config.frame_id == frame_id)
+    //if (lidar->livox_config.frame_id == frame_id)
     {
       DRIVER_INFO(*cur_node_, "Found Sensor with frame %s", frame_id.c_str());
       RawPacket raw_packet = {};
@@ -275,11 +278,12 @@ void Lddc::PackageCallback(const PacketMsg& packet)
       raw_packet.point_interval = packet.point_interval;
       raw_packet.raw_data = packet.raw_data;
       pub_handler_->AddPackage(&raw_packet);
+      break;
     }
-    else
+    /*else
     {
       //DRIVER_INFO(*cur_node_, "Sensor has frame %s", lidar->livox_config.frame_id.c_str());
-    }
+    }*/
   }
 }
 

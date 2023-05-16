@@ -172,6 +172,7 @@ void Lds::StorageLvxPointData(PointFrame* frame) {
 }
 
 void Lds::StoragePointData(PointFrame* frame) {
+  std::cout << "StoragePointData called" << std::endl;
   if (frame == nullptr) {
     return;
   }
@@ -184,11 +185,11 @@ void Lds::StoragePointData(PointFrame* frame) {
     uint64_t base_time = frame->base_time;
 
     uint8_t index = 0;
-    int8_t ret = cache_index_.GetIndex(lidar_point.lidar_type, lidar_point.handle, index);
+    /*int8_t ret = cache_index_.GetIndex(lidar_point.lidar_type, lidar_point.handle, index);
     if (ret != 0) {
       printf("Storage point data failed, lidar type:%u, handle:%u.\n", lidar_point.lidar_type, lidar_point.handle);
-      continue;
-    }
+      //continue;
+    }*/
     PushLidarData(&lidar_point, index, base_time);
   }
 }

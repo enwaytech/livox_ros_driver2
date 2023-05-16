@@ -183,9 +183,10 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
 }
 
 void PubHandler::PublishPointCloud() {
+  std::cout << "PublishPointCloud called" << std::endl;
   frame_.base_time = std::numeric_limits<uint64_t>::max();
   frame_.lidar_num = 0;
-
+  std::cout << "Calculate Base Time" << std::endl;
   // Calculate Base Time
   for (auto &process_handler : lidar_process_handlers_) {
     uint64_t base_time = process_handler.second->GetLidarBaseTime();
@@ -193,6 +194,7 @@ void PubHandler::PublishPointCloud() {
       frame_.base_time = base_time;
     }
   }
+  std::cout << "Get Lidar Point" << std::endl;
   // Get Lidar Point
   for (auto &process_handler : lidar_process_handlers_) {
     process_handler.second->SetLidarOffsetTime(frame_.base_time);
@@ -212,8 +214,10 @@ void PubHandler::PublishPointCloud() {
   }
   //publish point
   if (points_callback_) {
+    std::cout << "points_callback_" << std::endl;
     points_callback_(&frame_, pub_client_data_);
   }
+    std::cout << "PublishPointCloud done" << std::endl;
   return;
 }
 
@@ -236,6 +240,7 @@ void PubHandler::CheckTimer() {
 
 void PubHandler::RawDataProcess() {
   RawPacket raw_data;
+  std::cout << "RawDataProcess started" << std::endl;
   while (!is_quit_.load()) {
     {
       std::unique_lock<std::mutex> lock(packet_mutex_);
@@ -243,12 +248,13 @@ void PubHandler::RawDataProcess() {
         packet_condition_.wait_for(lock, std::chrono::milliseconds(500))  ;
         if (raw_packet_queue_.empty()) {
           continue;
-        } 
+        }
+        std::cout << "Found a package" << std::endl;
       }
       raw_data = raw_packet_queue_.front();
       raw_packet_queue_.pop_front();
     }
-
+    std::cout << "GetLidarID" << std::endl;
     uint32_t id = 0;
     GetLidarId(raw_data.lidar_type, raw_data.handle, id);
     if (lidar_process_handlers_.find(id) == lidar_process_handlers_.end()) {
@@ -258,6 +264,7 @@ void PubHandler::RawDataProcess() {
     if (lidar_extrinsics_.find(id) != lidar_extrinsics_.end()) {
         lidar_process_handlers_[id]->SetLidarsExtParam(lidar_extrinsics_[id]);
     }
+    std::cout << "Call PointCloudProcess with data" << std::endl;
     process_handler->PointCloudProcess(raw_data);
     CheckTimer();
   }
@@ -337,6 +344,7 @@ uint32_t LidarPubHandler::GetLidarPointCloudsSize() {
 }
 
 void LidarPubHandler::PointCloudProcess(RawPacket & pkt) {
+  std::cout << "PointCloudProcess called" << std::endl;
    //convert to standard format and extrinsic compensate
   if (pkt.lidar_type == LidarProtoType::kLivoxLidarType) {
     LivoxLidarPointCloudProcess(pkt);
@@ -350,6 +358,7 @@ void LidarPubHandler::PointCloudProcess(RawPacket & pkt) {
 }
 
 void LidarPubHandler::LivoxLidarPointCloudProcess(RawPacket & pkt) {
+  std::cout << "LivoxLidarPointCloudProcess called" << std::endl;
   switch (pkt.data_type) {
     case kLivoxLidarCartesianCoordinateHighData:
       ProcessCartesianHighPoint(pkt);
@@ -398,6 +407,7 @@ void LidarPubHandler::SetLidarsExtParam(LidarExtParameter lidar_param) {
 }
 
 void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
+  std::cout << "ProcessCartesianHighPoint called" << std::endl;
   LivoxLidarCartesianHighRawPoint* raw = (LivoxLidarCartesianHighRawPoint*)pkt.raw_data.data();
   PointXyzlt point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
@@ -423,6 +433,7 @@ void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
     std::lock_guard<std::mutex> lock(mutex_);
     points_clouds_.push_back(point);
   }
+  std::cout << "ProcessCartesianHighPoint done" << std::endl;
 }
 
 void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {

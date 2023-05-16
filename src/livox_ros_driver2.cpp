@@ -105,8 +105,8 @@ int main(int argc, char **argv) {
   }
   else if (data_src == kSourceRosTopic)
   {
-    std::string user_config_path;
-    nh.getParam("user_config_path", user_config_path);
+    std::string user_config_path {"/opt/enway/ws/src/cleansquare_ros/hardware/livox_ros_driver2/config/MID360_config.json"};
+    //nh.getParam("user_config_path", user_config_path);
     DRIVER_INFO(livox_node, "Config file : %s", user_config_path.c_str());
 
     LdsLidar *read_lidar = LdsLidar::GetInstance(publish_freq);
@@ -115,11 +115,11 @@ int main(int argc, char **argv) {
     livox_node.lddc_ptr_->SetRosSubscriber("/sensors/lidar/front_left/packets");
 
     livox_node.lddc_ptr_->RegisterLds(static_cast<Lds *>(read_lidar));
-    /*if ((read_lidar->InitLdsLidar(user_config_path))) {
+    if ((read_lidar->InitLdsLidar(user_config_path))) {
       DRIVER_INFO(livox_node, "Init lds lidar successfully!");
     } else {
       DRIVER_ERROR(livox_node, "Init lds lidar failed!");
-    }*/
+    }
   
   } else {
     DRIVER_ERROR(livox_node, "Invalid data src (%d), please check the launch file", data_src);

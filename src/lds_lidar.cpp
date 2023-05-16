@@ -85,13 +85,19 @@ bool LdsLidar::InitLdsLidar(const std::string& path_name) {
     g_lds_ldiar = this;
   }
 
+  SetLidarPubHandle();
+
   path_ = path_name;
   if (!InitLidars()) {
-    return false;
+    printf("InitLidars failed\n");
+    std::cout << "InitLidars failed" << std::endl;
+    //return false;
   }
-  SetLidarPubHandle();
+
   if (!Start()) {
-    return false;
+    std::cout << "Start failed" << std::endl;
+    printf("Start failed\n");
+    //return false;
   }
   is_initialized_ = true;
   return true;
@@ -140,7 +146,7 @@ bool LdsLidar::InitLivoxLidar() {
   // SDK initialization
   if (!LivoxLidarSdkInit(path_.c_str())) {
     std::cout << "Failed to init livox lidar sdk." << std::endl;
-    return false;
+    //return false;
   }
 
   // fill in lidar devices
