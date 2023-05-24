@@ -32,8 +32,6 @@
 #include <stdint.h>
 #include <string>
 
-#include "include/ros_headers.h"
-
 #include "driver_node.h"
 #include "lds_lidar.h"
 
@@ -50,7 +48,8 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
       publish_frq_(frq),
       frame_id_(frame_id),
       enable_lidar_bag_(lidar_bag),
-      enable_imu_bag_(imu_bag) {
+      enable_imu_bag_(imu_bag),
+      counter_{0} {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
@@ -62,6 +61,8 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
   cur_node_ = nullptr;
   bag_ = nullptr;
   pub_handler_ = nullptr;
+  //counterThread_ = std::thread(Lddc::countFrequency, std::ref(counter_));
+  counterThread_ = std::thread(&Lddc::countFrequency, this, std::ref(counter_));
 }
 #elif defined BUILDING_ROS2
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
@@ -79,6 +80,17 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
 #endif
 }
 #endif
+
+void Lddc::countFrequency(std::atomic<int>& counter)
+{
+    while (true)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        int currentCount = counter.exchange(0);
+        double freq = 10.0 * currentCount;
+        std::cout << "Frequency: " << freq << " per second = " << freq * 96 << " pts" << std::endl;
+    }
+}
 
 Lddc::~Lddc() {
 #ifdef BUILDING_ROS1
@@ -188,10 +200,17 @@ void Lddc::DistributePacketData(void) {
   lds_->packet_semaphore_.Wait();
   for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
     uint32_t lidar_id = i;
+    if (lidar_id > 0)
+    { 
+      break;
+    }
     LidarDevice *lidar = &lds_->lidars_[lidar_id];
     LidarPacketDataQueue *p_queue = &lidar->packet_data;
     if ((kConnectStateSampling != lidar->connect_state) || (p_queue == nullptr)) {
-      continue;
+      if (i != 0)
+      {
+        continue;
+      } 
     }
     PollingLidarPacketData(lidar_id, lidar);
   }
@@ -203,7 +222,7 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
     return;
   }
   while (!lds_->IsRequestExit() && !QueueIsEmpty(p_queue)) {
-    std::cout << "PollingLidarPointCloudData" << std::endl;
+    //std::cout << "PollingLidarPointCloudData" << std::endl;
     if (kPointCloud2Msg == transfer_format_) {
       PublishPointcloud2(p_queue, index, lidar->livox_config.frame_id);
     } else if (kLivoxCustomMsg == transfer_format_) {
@@ -252,12 +271,22 @@ void Lddc::SetPubHandler(livox_ros::PubHandler *pub_handler)
 void Lddc::SetRosSubscriber(const std::string topic)
 {
   DRIVER_INFO(*cur_node_, "Subscribe to rostopic %s\n", topic.c_str());
-  ros_sub_ = cur_node_->subscribe(topic, 1, &Lddc::PackageCallback, this);
+  ros_sub_ = cur_node_->subscribe(topic, 0, &Lddc::PackageCallback, this);
 }
+
+#if 1
+void Lddc::PackagesCallback(const PacketMsgs& packets)
+{
+  /*for (auto packet : packets)
+  {
+    PackageCallback(packet);
+  }*/
+}
+#endif
 
 void Lddc::PackageCallback(const PacketMsg& packet)
 {
-  DRIVER_INFO(*cur_node_, "Received new packet\n");
+  //DRIVER_INFO(*cur_node_, "Received new packet\n");
   // search lds pub handler for topic? or how do distinquish between packets?
   //lds_->packet_semaphore_.Wait();
   for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
@@ -266,7 +295,8 @@ void Lddc::PackageCallback(const PacketMsg& packet)
     std::string frame_id {"front_left"};
     //if (lidar->livox_config.frame_id == frame_id)
     {
-      DRIVER_INFO(*cur_node_, "Found Sensor with frame %s", frame_id.c_str());
+      //DRIVER_INFO(*cur_node_, "Found Sensor with frame %s", frame_id.c_str());
+
       RawPacket raw_packet = {};
       raw_packet.handle = packet.handle;
       raw_packet.lidar_type = static_cast<LidarProtoType>(packet.lidar_type);
@@ -277,7 +307,13 @@ void Lddc::PackageCallback(const PacketMsg& packet)
       raw_packet.time_stamp = packet.time_stamp;
       raw_packet.point_interval = packet.point_interval;
       raw_packet.raw_data = packet.raw_data;
-      pub_handler_->AddPackage(&raw_packet);
+#if 1
+      pub_handler_->AddPackage(raw_packet);
+#endif
+      counter_++;
+#if 0
+      pub_handler_->PublishPacket(raw_packet);
+#endif
       break;
     }
     /*else
@@ -295,11 +331,13 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       printf("Publish point cloud2 failed, the pkg points is empty.\n");
       continue;
     }
-
+    std::cout << "Publish points: " << pkg.points_num << std::endl;
+#if 1
     PointCloud2 cloud;
     uint64_t timestamp = 0;
     InitPointcloud2Msg(pkg, cloud, timestamp, frame_id);
     PublishPointcloud2Data(index, timestamp, cloud);
+#endif
   }
 }
 
@@ -595,6 +633,7 @@ void Lddc::InitPacketMsg(const RawPacketData& packet_data, PacketMsg& packet_msg
 }
 
 void Lddc::PublishPacketData(LidarPacketDataQueue& packet_data_queue, const uint8_t index, const std::string& frame_id) {
+  std::cout << "PublishPacketData" << std::endl;
   RawPacketData packet_data;
   if (!packet_data_queue.Pop(packet_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -608,7 +647,7 @@ void Lddc::PublishPacketData(LidarPacketDataQueue& packet_data_queue, const uint
   PublisherPtr publisher_ptr = GetCurrentPacketPublisher(index);
 
   if (kOutputToRos == output_type_) {
-    //DRIVER_ERROR(*cur_node_, "Publish Packet Msg\n");
+    DRIVER_ERROR(*cur_node_, "Publish Packet Msg\n");
     publisher_ptr->publish(packet_msg);
   }
 #if 0

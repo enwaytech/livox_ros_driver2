@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
     LdsLidar *read_lidar = LdsLidar::GetInstance(publish_freq);
     DRIVER_INFO(livox_node, "Data Source is from rostopic.");
     livox_node.lddc_ptr_->SetPubHandler(read_lidar->GetPubHandler());
-    livox_node.lddc_ptr_->SetRosSubscriber("/sensors/lidar/front_left/packets");
+    livox_node.lddc_ptr_->SetRosSubscriber("/livox/packet"); ///sensors/lidar/front_left/packets");
 
     livox_node.lddc_ptr_->RegisterLds(static_cast<Lds *>(read_lidar));
     if ((read_lidar->InitLdsLidar(user_config_path))) {
@@ -126,10 +126,13 @@ int main(int argc, char **argv) {
   }
 
   livox_node.pointclouddata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PointCloudDataPollThread, &livox_node);
-  livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
-  livox_node.packet_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PacketPollThread, &livox_node);
-  while (ros::ok()) { ros::spinOnce(); usleep(10000); }
-
+  //livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
+  //livox_node.packet_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PacketPollThread, &livox_node);
+  //while (ros::ok()) { ros::(); usleep(10000); }
+  ros::spin();
+  //ros::MultiThreadedSpinner spinner(8);
+  //spinner.spin();
+  //ros::spin();
   return 0;
 }
 

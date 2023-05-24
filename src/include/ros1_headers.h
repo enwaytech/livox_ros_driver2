@@ -38,7 +38,7 @@
 #include "livox_ros_driver2/CustomMsg.h"
 #include "livox_ros_driver2/CustomPoint.h"
 #include "livox_ros_driver2/PacketMsg.h"
-
+#include "livox_ros_driver2/PacketMsgs.h"
 
 #define DRIVER_DEBUG(node, ...) ROS_DEBUG(__VA_ARGS__)
 #define DRIVER_INFO(node, ...) ROS_INFO(__VA_ARGS__)

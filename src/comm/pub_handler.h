@@ -93,7 +93,8 @@ class PubHandler {
   void ClearAllLidarsExtrinsicParams();
   void SetPacketCallback(PacketCallback cb, void* client_data);
   void SetImuDataCallback(ImuDataCallback cb, void* client_data);
-  void AddPackage(RawPacket *packet);
+  void AddPackage(const RawPacket& packet);
+  void PublishPacket(RawPacket& packet);
 
  private:
   //thread to process raw data
@@ -103,10 +104,13 @@ class PubHandler {
   std::mutex packet_mutex_;
   std::condition_variable packet_condition_;
 
+  std::mutex raw_packet_mutex_;
+  std::vector<RawPacket> raw_packets_;
+
   //publish callback
   void CheckTimer();
   void PublishPointCloud();
-  void PublishPacket(RawPacket *packet);
+
   static void OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t dev_type,
                                              LivoxLidarEthernetPacket *data, void *client_data);
   

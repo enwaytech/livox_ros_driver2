@@ -132,11 +132,11 @@ void Lds::StoragePacketData(RawPacketData* packet) {
   }
 
   uint8_t index = 0;
-  int ret = cache_index_.GetIndex(packet->lidar_type, device_num, index);
+  /*int ret = cache_index_.GetIndex(packet->lidar_type, device_num, index);
   if (ret != 0) {
     printf("Storage packet data failed, can not get index, lidar type:%u, device_num:%u.\n", packet->lidar_type, device_num);
     return;
-  }
+  }*/
 
   LidarDevice *p_lidar = &lidars_[index];
   LidarPacketDataQueue* packet_queue = &p_lidar->packet_data;
@@ -191,6 +191,7 @@ void Lds::StoragePointData(PointFrame* frame) {
       //continue;
     }*/
     PushLidarData(&lidar_point, index, base_time);
+    break;
   }
 }
 
@@ -203,7 +204,7 @@ void Lds::PushLidarData(PointPacket* lidar_data, const uint8_t index, const uint
   LidarDataQueue *queue = &p_lidar->data;
 
   if (nullptr == queue->storage_packet) {
-    uint32_t queue_size = CalculatePacketQueueSize(publish_freq_);
+    uint32_t queue_size = 10 * CalculatePacketQueueSize(publish_freq_);
     InitQueue(queue, queue_size);
     printf("Lidar[%u] storage queue size: %u\n", index, queue_size);
   }

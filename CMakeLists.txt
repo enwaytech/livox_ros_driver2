@@ -46,6 +46,7 @@ add_message_files(FILES
   CustomPoint.msg
   CustomMsg.msg
   PacketMsg.msg
+  PacketMsgs.msg
 #   Message2.msg
 )
 

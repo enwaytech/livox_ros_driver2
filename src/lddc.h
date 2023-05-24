@@ -29,6 +29,7 @@
 #include "comm/pub_handler.h"
 #include "driver_node.h"
 #include "lds.h"
+#include "include/ros_headers.h"
 #include <string>
 
 namespace livox_ros {
@@ -58,6 +59,7 @@ using CustomMsg = livox_ros_driver2::CustomMsg;
 using CustomPoint = livox_ros_driver2::CustomPoint;
 using ImuMsg = sensor_msgs::Imu;
 using PacketMsg = livox_ros_driver2::PacketMsg;
+using PacketMsgs = livox_ros_driver2::PacketMsgs;
 #elif defined BUILDING_ROS2
 template <typename MessageT> using Publisher = rclcpp::Publisher<MessageT>;
 using PublisherPtr = std::shared_ptr<rclcpp::PublisherBase>;
@@ -140,7 +142,8 @@ class Lddc final {
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
   PublisherPtr GetCurrentPacketPublisher(uint8_t handle);
   void PackageCallback(const PacketMsg& packet);
-
+  void PackagesCallback(const PacketMsgs& packets);
+  void countFrequency(std::atomic<int>& counter);
  private:
   uint8_t transfer_format_;
   uint8_t use_multi_topic_;
@@ -149,7 +152,8 @@ class Lddc final {
   double publish_frq_;
   uint32_t publish_period_ns_;
   std::string frame_id_;
-
+  std::atomic<int> counter_;
+  std::thread counterThread_;
 #ifdef BUILDING_ROS1
   bool enable_lidar_bag_;
   bool enable_imu_bag_;
