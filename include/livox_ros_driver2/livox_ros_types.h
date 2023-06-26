@@ -29,6 +29,9 @@ struct PCLLivoxPointXyzrtl
     , reflectivity {pt.reflectivity}
     , tag {pt.tag}
     , line {pt.line}
+    , range {pt.range}
+    , theta {pt.theta}
+    , phi {pt.phi}
   {
   }
 
@@ -36,6 +39,9 @@ struct PCLLivoxPointXyzrtl
   float reflectivity;
   uint8_t tag;
   uint8_t line;
+  float range;
+  float theta;
+  float phi;
 
   PCL_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
@@ -51,5 +57,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(livox_ros::PCLLivoxPointXyzrtl,
   (float, reflectivity, intensity)
   (std::uint8_t, tag, tag)
   (std::uint8_t, line, line)
+  (float, range, range)
+  (float, theta, theta)
+  (float, phi, phi)
 );
 // clang-format on

@@ -155,6 +155,10 @@ typedef struct {
   float reflectivity; /**< Reflectivity   */
   uint8_t tag;        /**< Livox point tag   */
   uint8_t line;       /**< Laser line id     */
+  // Georg
+  float range;
+  float theta;
+  float phi;
 } LivoxPointXyzrtl;
 
 typedef struct {
@@ -165,6 +169,10 @@ typedef struct {
   uint8_t tag;
   uint8_t line;
   uint64_t offset_time;
+  // Georg
+  float range;
+  float theta;
+  float phi;
 } PointXyzlt;
 
 typedef struct {

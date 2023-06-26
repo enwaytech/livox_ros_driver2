@@ -290,6 +290,9 @@ Lddc::PublishPointcloud2(LidarDataQueue* queue, uint8_t index, const std::string
         livox_point.reflectivity = point.intensity;
         livox_point.tag = point.tag;
         livox_point.line = point.line;
+        livox_point.range = point.range;
+        livox_point.theta = point.theta;
+        livox_point.phi = point.phi;
         dust_filter.addMeasurement(livox_point);
       }
       // Get result cloud without dust
@@ -320,8 +323,11 @@ Lddc::PublishPointcloud2(LidarDataQueue* queue, uint8_t index, const std::string
         point.reflectivity = dust_filtered_cloud.points.at(i).reflectivity;
         point.tag = dust_filtered_cloud.points.at(i).tag;
         point.line = dust_filtered_cloud.points.at(i).line;
-
+        point.range = dust_filtered_cloud.points.at(i).range;
+        point.theta = dust_filtered_cloud.points.at(i).theta;
+        point.phi = dust_filtered_cloud.points.at(i).phi;
         points.push_back(std::move(point));
+
       }
       cloud.data.resize(dust_filtered_cloud.points.size() * sizeof(LivoxPointXyzrtl));
       memcpy(cloud.data.data(), points.data(), points.size() * sizeof(LivoxPointXyzrtl));
@@ -393,7 +399,7 @@ Lddc::InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id)
   cloud.header.frame_id.assign(frame_id);
   cloud.height = 1;
   cloud.width = 0;
-  cloud.fields.resize(6);
+  cloud.fields.resize(9);
   cloud.fields[0].offset = 0;
   cloud.fields[0].name = "x";
   cloud.fields[0].count = 1;
@@ -418,6 +424,18 @@ Lddc::InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id)
   cloud.fields[5].name = "line";
   cloud.fields[5].count = 1;
   cloud.fields[5].datatype = PointField::UINT8;
+  cloud.fields[6].offset = 18;
+  cloud.fields[6].name = "range";
+  cloud.fields[6].count = 1;
+  cloud.fields[6].datatype = PointField::FLOAT32;
+  cloud.fields[7].offset = 22;
+  cloud.fields[7].name = "theta";
+  cloud.fields[7].count = 1;
+  cloud.fields[7].datatype = PointField::FLOAT32;
+  cloud.fields[8].offset = 26;
+  cloud.fields[8].name = "phi";
+  cloud.fields[8].count = 1;
+  cloud.fields[8].datatype = PointField::FLOAT32;
   cloud.point_step = sizeof(LivoxPointXyzrtl);
 }
 
@@ -455,7 +473,9 @@ Lddc::InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t&
     point.reflectivity = pkg.points[i].intensity;
     point.tag = pkg.points[i].tag;
     point.line = pkg.points[i].line;
-
+    point.range = pkg.points[i].range;
+    point.theta = pkg.points[i].theta;
+    point.phi = pkg.points[i].phi;
     points.push_back(std::move(point));
   }
   cloud.data.resize(pkg.points_num * sizeof(LivoxPointXyzrtl));
@@ -606,9 +626,13 @@ Lddc::FillPointsToPclMsg(const StoragePacket& pkg, PointCloud& pcl_msg)
     point.y = points[i].y;
     point.z = points[i].z;
     point.intensity = points[i].intensity;
+    //point.radius = points[i].radius;
+    //point.theta = points[i].theta;
+    //point.phi = points[i].phi;
 
     pcl_msg.points.push_back(std::move(point));
   }
+  std::cout << "FillPointsToPclMsg " << std::endl;
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
             << "please check code logic" << std::endl;
