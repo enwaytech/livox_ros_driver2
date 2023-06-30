@@ -37,6 +37,7 @@
 #include <map>
 
 #include "lidar_imu_data_queue.h"
+#include "livox_ros_driver2/livox_point.h"
 
 namespace livox_ros {
 
