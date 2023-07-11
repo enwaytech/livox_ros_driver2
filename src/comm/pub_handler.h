@@ -48,6 +48,7 @@ class LidarPubHandler {
 
   void PointCloudProcess(RawPacket& pkt);
   void SetLidarsExtParam(LidarExtParameter param);
+  void SetLidarsFilterParam(LidarFilterParameter param);
   void GetLidarPointClouds(std::vector<PointXyzlt>& points_clouds);
 
   uint64_t GetRecentTimeStamp();
@@ -59,6 +60,7 @@ class LidarPubHandler {
   void ProcessCartesianHighPoint(RawPacket & pkt);
   void ProcessCartesianLowPoint(RawPacket & pkt);
   void ProcessSphericalPoint(RawPacket & pkt);
+  bool FilterYawPoint(const PointXyzlt& point);
   std::vector<PointXyzlt> points_clouds_;
   ExtParameterDetailed extrinsic_ = {
     {0, 0, 0},
@@ -68,8 +70,19 @@ class LidarPubHandler {
       {0, 0, 1}
     }
   };
+  ExtParameterDetailed filter_transform_ = {
+    {0, 0, 0},
+    {
+      {1, 0, 0},
+      {0, 1, 1},
+      {0, 0, 1}
+    }
+  };
+  float filter_yaw_max_;
+  float filter_yaw_min_;
   std::mutex mutex_;
   std::atomic_bool is_set_extrinsic_params_;
+  std::atomic_bool is_set_filter_params_;
 };
   
 class PubHandler {
