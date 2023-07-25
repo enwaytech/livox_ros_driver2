@@ -26,7 +26,7 @@
 #include "comm/comm.h"
 #include "comm/ldq.h"
 
-
+#include <boost/assign.hpp>
 #include <inttypes.h>
 #include <iostream>
 #include <iomanip>
@@ -166,7 +166,7 @@ void Lddc::DistributeImuData(void) {
     std::cout << "DistributeImuData is RequestExit" << std::endl;
     return;
   }
-  
+
   lds_->imu_semaphore_.Wait();
   for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
     uint32_t lidar_id = i;
@@ -546,7 +546,7 @@ void Lddc::InitPclMsg(const StoragePacket& pkg, PointCloud& cloud, uint64_t& tim
   cloud.header.stamp = timestamp / 1000.0;  // to pcl ros time stamp
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
-            << "please check code logic" 
+            << "please check code logic"
             << std::endl;
 #endif
   return;
@@ -571,7 +571,7 @@ void Lddc::FillPointsToPclMsg(const StoragePacket& pkg, PointCloud& pcl_msg) {
   }
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
-            << "please check code logic" 
+            << "please check code logic"
             << std::endl;
 #endif
   return;
@@ -589,7 +589,7 @@ void Lddc::PublishPclData(const uint8_t index, const uint64_t timestamp, const P
   }
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
-            << "please check code logic" 
+            << "please check code logic"
             << std::endl;
 #endif
   return;
@@ -605,12 +605,71 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
 
+  // no data regarding orientation, so leave imu_msg.orientation and imu_msg.orientation_covariance blank (all 0)
+
+  // set angular velocity and linear acceleration to data received from the IMU
   imu_msg.angular_velocity.x = imu_data.gyro_x;
   imu_msg.angular_velocity.y = imu_data.gyro_y;
   imu_msg.angular_velocity.z = imu_data.gyro_z;
+
   imu_msg.linear_acceleration.x = imu_data.acc_x;
   imu_msg.linear_acceleration.y = imu_data.acc_y;
   imu_msg.linear_acceleration.z = imu_data.acc_z;
+
+  // set covariances from config
+  imu_msg.angular_velocity_covariance = boost::assign::list_of
+    (0.003) (0.0)   (0.0)
+    (0.0)   (0.003) (0.0)
+    (0.0)   (0.0)   (0.003);
+
+  // imu_msg.angular_velocity_covariance = [   0.003,   0.0,   0.0,
+  //                                           0.0,   0.003,   0.0,
+  //                                           0.0,   0.0,   0.003];
+
+  imu_msg.linear_acceleration_covariance = boost::assign::list_of
+    (0.05) (0.0)   (0.0)
+    (0.0)   (0.05) (0.0)
+    (0.0)   (0.0)   (0.05);
+
+  // imu_msg.linear_acceleration_covariance = [   0.05,   0.0,   0.0, 0.0,   0.05,   0.0, 0.0,   0.0,   0.05];
+
+//   for(int i = 0; i < 9; i++) {
+// 	  imu_msg.orientation_covariance[i] = orientation_covariance_[i];
+// 	  imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
+// 	  imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
+//   }
+
+
+//   orientation_covariance:           [   0.05,   0.0,   0.0,
+//                                       0.0,   0.05,   0.0,
+//                                       0.0,   0.0,   0.05]
+
+// angular_velocity_covariance:      [   0.003,   0.0,   0.0,
+//                                       0.0,   0.003,   0.0,
+//                                       0.0,   0.0,   0.003]
+
+// linear_acceleration_covariance:   [   0.05,   0.0,   0.0,
+//                                       0.0,   0.05,   0.0,
+//                                       0.0,   0.0,   0.05]
+
+
+
+// geometry_msgs/Quaternion orientation
+//   float64 x
+//   float64 y
+//   float64 z
+//   float64 w
+// float64[9] orientation_covariance
+// geometry_msgs/Vector3 angular_velocity
+//   float64 x
+//   float64 y
+//   float64 z
+// float64[9] angular_velocity_covariance
+// // geometry_msgs/Vector3 linear_acceleration
+// //   float64 x
+// //   float64 y
+// //   float64 z
+// float64[9] linear_acceleration_covariance
 }
 
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& frame_id) {
