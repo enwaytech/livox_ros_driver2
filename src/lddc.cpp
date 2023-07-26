@@ -26,7 +26,7 @@
 #include "comm/comm.h"
 #include "comm/ldq.h"
 
-#include <boost/assign.hpp>
+// #include <boost/assign.hpp>
 #include <inttypes.h>
 #include <iostream>
 #include <iomanip>
@@ -47,14 +47,19 @@ namespace livox_ros
 
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
-Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
-    double frq, std::string &frame_id, bool lidar_bag, bool imu_bag, bool dust_filter)
+Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
+    std::string &frame_id, const std::vector<double>& orientation_covariance,
+    const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
+    bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
       output_type_(output_type),
       publish_frq_(frq),
       frame_id_(frame_id),
+      orientation_covariance_(orientation_covariance),
+      angular_velocity_covariance_(angular_velocity_covariance),
+      linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
       enable_imu_bag_(imu_bag) {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
@@ -617,59 +622,25 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.linear_acceleration.z = imu_data.acc_z;
 
   // set covariances from config
-  imu_msg.angular_velocity_covariance = boost::assign::list_of
-    (0.003) (0.0)   (0.0)
-    (0.0)   (0.003) (0.0)
-    (0.0)   (0.0)   (0.003);
+  for(int i = 0; i < 9; i++)
+  {
+	  imu_msg.orientation_covariance[i] = orientation_covariance_[i];
+	  imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
+	  imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
+  }
 
-  // imu_msg.angular_velocity_covariance = [   0.003,   0.0,   0.0,
-  //                                           0.0,   0.003,   0.0,
-  //                                           0.0,   0.0,   0.003];
+  // TODO if there is never orientation data, then should set the 1st element of the orientation_covariance to -1
+  // following convention in https://docs.ros.org/en/noetic/api/sensor_msgs/html/msg/Imu.html
 
-  imu_msg.linear_acceleration_covariance = boost::assign::list_of
-    (0.05) (0.0)   (0.0)
-    (0.0)   (0.05) (0.0)
-    (0.0)   (0.0)   (0.05);
+  // imu_msg.angular_velocity_covariance = boost::assign::list_of
+  //   (0.003) (0.0)   (0.0)
+  //   (0.0)   (0.003) (0.0)
+  //   (0.0)   (0.0)   (0.003);
 
-  // imu_msg.linear_acceleration_covariance = [   0.05,   0.0,   0.0, 0.0,   0.05,   0.0, 0.0,   0.0,   0.05];
-
-//   for(int i = 0; i < 9; i++) {
-// 	  imu_msg.orientation_covariance[i] = orientation_covariance_[i];
-// 	  imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
-// 	  imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
-//   }
-
-
-//   orientation_covariance:           [   0.05,   0.0,   0.0,
-//                                       0.0,   0.05,   0.0,
-//                                       0.0,   0.0,   0.05]
-
-// angular_velocity_covariance:      [   0.003,   0.0,   0.0,
-//                                       0.0,   0.003,   0.0,
-//                                       0.0,   0.0,   0.003]
-
-// linear_acceleration_covariance:   [   0.05,   0.0,   0.0,
-//                                       0.0,   0.05,   0.0,
-//                                       0.0,   0.0,   0.05]
-
-
-
-// geometry_msgs/Quaternion orientation
-//   float64 x
-//   float64 y
-//   float64 z
-//   float64 w
-// float64[9] orientation_covariance
-// geometry_msgs/Vector3 angular_velocity
-//   float64 x
-//   float64 y
-//   float64 z
-// float64[9] angular_velocity_covariance
-// // geometry_msgs/Vector3 linear_acceleration
-// //   float64 x
-// //   float64 y
-// //   float64 z
-// float64[9] linear_acceleration_covariance
+  // imu_msg.linear_acceleration_covariance = boost::assign::list_of
+  //   (0.05) (0.0)   (0.0)
+  //   (0.0)   (0.05) (0.0)
+  //   (0.0)   (0.0)   (0.05);
 }
 
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& frame_id) {
