@@ -26,7 +26,6 @@
 #include "comm/comm.h"
 #include "comm/ldq.h"
 
-// #include <boost/assign.hpp>
 #include <inttypes.h>
 #include <iostream>
 #include <iomanip>
@@ -48,16 +47,14 @@ namespace livox_ros
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-    std::string &frame_id, const std::vector<double>& orientation_covariance,
-    const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
-    bool lidar_bag, bool imu_bag, bool dust_filter)
+    std::string &frame_id, const std::vector<double>& angular_velocity_covariance,
+    const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
       output_type_(output_type),
       publish_frq_(frq),
       frame_id_(frame_id),
-      orientation_covariance_(orientation_covariance),
       angular_velocity_covariance_(angular_velocity_covariance),
       linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
@@ -610,8 +607,6 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
 
-  // no data regarding orientation, so leave imu_msg.orientation and imu_msg.orientation_covariance blank (all 0)
-
   // set angular velocity and linear acceleration to data received from the IMU
   imu_msg.angular_velocity.x = imu_data.gyro_x;
   imu_msg.angular_velocity.y = imu_data.gyro_y;
@@ -621,26 +616,17 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.linear_acceleration.y = imu_data.acc_y;
   imu_msg.linear_acceleration.z = imu_data.acc_z;
 
-  // set covariances from config
+  // set covariances from config for angular_velocity and linear_acceleration
   for(int i = 0; i < 9; i++)
   {
-	  imu_msg.orientation_covariance[i] = orientation_covariance_[i];
 	  imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
 	  imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
+	  imu_msg.orientation_covariance[i] = 0;
   }
 
-  // TODO if there is never orientation data, then should set the 1st element of the orientation_covariance to -1
-  // following convention in https://docs.ros.org/en/noetic/api/sensor_msgs/html/msg/Imu.html
-
-  // imu_msg.angular_velocity_covariance = boost::assign::list_of
-  //   (0.003) (0.0)   (0.0)
-  //   (0.0)   (0.003) (0.0)
-  //   (0.0)   (0.0)   (0.003);
-
-  // imu_msg.linear_acceleration_covariance = boost::assign::list_of
-  //   (0.05) (0.0)   (0.0)
-  //   (0.0)   (0.05) (0.0)
-  //   (0.0)   (0.0)   (0.05);
+  // IMU does not provide orientation data, so leave imu_msg.orientation with all 0 and set element 0 of the associated
+  // covariance matrix to -1 (following the ROS message specifications)
+  imu_msg.orientation_covariance[0] = -1;
 }
 
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& frame_id) {
