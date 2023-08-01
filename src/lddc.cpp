@@ -46,6 +46,7 @@ namespace livox_ros
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
+           bool transform_imu_to_body_aligned_frame, const std::string& body_aligned_frame_id,
            const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
            bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
@@ -54,10 +55,13 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
       output_type_(output_type),
       publish_frq_(frq),
       frame_id_(frame_id),
+      transform_imu_to_body_aligned_frame_(transform_imu_to_body_aligned_frame),
+      body_aligned_frame_id_(body_aligned_frame_id),
       angular_velocity_covariance_(angular_velocity_covariance),
       linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
-      enable_imu_bag_(imu_bag) {
+      enable_imu_bag_(imu_bag),
+      tf_listener_(tf_buffer_) {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
@@ -610,6 +614,27 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.linear_acceleration.x = imu_data.acc_x * g_to_ms2;
   imu_msg.linear_acceleration.y = imu_data.acc_y * g_to_ms2;
   imu_msg.linear_acceleration.z = imu_data.acc_z * g_to_ms2;
+
+  if (transform_imu_to_body_aligned_frame_)
+  {
+    geometry_msgs::TransformStamped transform;
+    try
+    {
+      // Transform from the original frame to "base_link" or another target frame
+      // transform = tf_buffer_.lookupTransform(body_aligned_frame_id_, imu_msg.header.frame_id, imu_msg.header.stamp,
+      //                                        ros::Duration(0.1));
+      tf_buffer_.transform(imu_msg, imu_msg, body_aligned_frame_id_); // TODO test
+
+    }
+    catch (tf2::TransformException &ex)
+    {
+      ROS_ERROR_STREAM_THROTTLE(1.0, ex.what());
+      return;
+    }
+
+  // Perform the transformation
+  // tf2::doTransform(transformed_imu, transformed_imu, transformStamped);
+  }
 
   // set covariances from config for angular_velocity and linear_acceleration, and reset orientation_covariance
   for(int i = 0; i < 9; i++)
