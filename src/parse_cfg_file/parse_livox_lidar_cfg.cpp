@@ -24,6 +24,7 @@
 
 #include "parse_livox_lidar_cfg.h"
 #include <iostream>
+#include <optional>
 #include <string>
 
 namespace livox_ros {
@@ -98,6 +99,21 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
       std::cout << "No frame id was given, set to default of 'livox_lidar'" << std::endl;
     } else {
       user_config.frame_id = static_cast<std::string>(config["frame_id"].GetString());
+    }
+    if (!config.HasMember("transform_imu_to_body_aligned_frame")) {
+      user_config.body_aligned_frame_id = std::nullopt;
+    } else {
+      bool transform_imu_to_body_aligned_frame = config["transform_imu_to_body_aligned_frame"].GetBool();
+      if (!transform_imu_to_body_aligned_frame) {
+        user_config.body_aligned_frame_id = std::nullopt;
+      } else {
+        if (!config.HasMember("body_aligned_frame_id")) {
+          std::cout << "Error: 'body_aligned_frame_id' must be specified if 'transform_imu_to_body_aligned_frame' is set to true" << std::endl;
+          return false;
+        } else {
+          user_config.body_aligned_frame_id = std::make_optional(static_cast<std::string>(config["body_aligned_frame_id"].GetString()));
+        }
+      }
     }
     if (!config.HasMember("extrinsic_parameter")) {
       memset(&user_config.extrinsic_param, 0, sizeof(user_config.extrinsic_param));

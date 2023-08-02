@@ -79,8 +79,7 @@ class DriverNode;
 class Lddc final {
  public:
 #ifdef BUILDING_ROS1
-  Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-      std::string &frame_id, bool transform_imu_to_body_aligned_frame, const std::string& body_aligned_frame_id,
+  Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
       const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
       bool lidar_bag, bool imu_bag, bool dust_filter);
 #elif defined BUILDING_ROS2
@@ -113,7 +112,8 @@ class Lddc final {
   void PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
 
-  void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id);
+  void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id,
+                      std::optional<std::string> body_aligned_frame_id);
 
   void InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id);
   void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
@@ -128,6 +128,7 @@ class Lddc final {
   void PublishPclData(const uint8_t index, const uint64_t timestamp, const PointCloud& cloud);
 
   void InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, const std::string& lidar_frame_id);
+  void TransformImuMsg(ImuMsg& imu_msg, const std::string& body_aligned_frame_id);
 
   void FillPointsToPclMsg(PointCloud& pcl_msg, LivoxPointXyzrtlt* src_point, uint32_t num);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, LivoxPointXyzrtlt* src_point, uint32_t num,
