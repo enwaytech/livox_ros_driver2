@@ -100,18 +100,18 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
     } else {
       user_config.frame_id = static_cast<std::string>(config["frame_id"].GetString());
     }
-    if (!config.HasMember("transform_imu_to_body_aligned_frame")) {
-      user_config.body_aligned_frame_id = std::nullopt;
+    if (!config.HasMember("transform_imu_to_external_frame")) {
+      user_config.external_frame_id = std::nullopt;
     } else {
-      bool transform_imu_to_body_aligned_frame = config["transform_imu_to_body_aligned_frame"].GetBool();
-      if (!transform_imu_to_body_aligned_frame) {
-        user_config.body_aligned_frame_id = std::nullopt;
+      bool transform_imu_to_external_frame = config["transform_imu_to_external_frame"].GetBool();
+      if (!transform_imu_to_external_frame) {
+        user_config.external_frame_id = std::nullopt;
       } else {
-        if (!config.HasMember("body_aligned_frame_id")) {
-          std::cout << "Error: 'body_aligned_frame_id' must be specified if 'transform_imu_to_body_aligned_frame' is set to true" << std::endl;
+        if (!config.HasMember("external_frame_id")) {
+          std::cout << "Error: 'external_frame_id' must be specified if 'transform_imu_to_external_frame' is set to true" << std::endl;
           return false;
         } else {
-          user_config.body_aligned_frame_id = std::make_optional(static_cast<std::string>(config["body_aligned_frame_id"].GetString()));
+          user_config.external_frame_id = std::make_optional(static_cast<std::string>(config["external_frame_id"].GetString()));
         }
       }
     }

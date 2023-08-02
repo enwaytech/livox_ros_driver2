@@ -277,7 +277,7 @@ typedef struct {
   int32_t blind_spot_set;
   int8_t dual_emit_en;
   std::string frame_id;
-  std::optional<std::string> body_aligned_frame_id;
+  std::optional<std::string> external_frame_id;
   ExtParameter extrinsic_param;
   bool enable_yaw_filter;
   FilterParameter filter_param;
