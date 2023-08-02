@@ -66,7 +66,7 @@ LdsLidar *g_lds_ldiar = nullptr;
 
 /** Lds lidar function -------------------------------------------------------*/
 LdsLidar::LdsLidar(double publish_freq)
-    : Lds(publish_freq, kSourceRawLidar), 
+    : Lds(publish_freq, kSourceRawLidar),
       auto_connect_mode_(true),
       whitelist_count_(0),
       is_initialized_(false) {
@@ -140,6 +140,7 @@ bool LdsLidar::InitLivoxLidar() {
   std::vector<UserLivoxLidarConfig> user_configs;
   if (!parser.Parse(user_configs)) {
     std::cout << "failed to parse user-defined config" << std::endl;
+    return false;
   }
 
   // SDK initialization
