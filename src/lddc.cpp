@@ -45,9 +45,9 @@ namespace livox_ros
 
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
-Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-    std::string &frame_id, const std::vector<double>& angular_velocity_covariance,
-    const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter)
+Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
+           const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
+           bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
@@ -600,18 +600,18 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
 
-  // set angular velocity to data received from the IMU, in rad/s
+  // set angular velocity to data received from the IMU [in rad/s]
   imu_msg.angular_velocity.x = imu_data.gyro_x;
   imu_msg.angular_velocity.y = imu_data.gyro_y;
   imu_msg.angular_velocity.z = imu_data.gyro_z;
 
-  // according to the ROS message specifications, the linear acceleration should be in and m/s^2, but imu_data uses g's
+  // convert the linear acceleration from g's to m/s^2, following the ROS message specifications
   constexpr float g_to_ms2 = 9.80665;
   imu_msg.linear_acceleration.x = imu_data.acc_x * g_to_ms2;
   imu_msg.linear_acceleration.y = imu_data.acc_y * g_to_ms2;
   imu_msg.linear_acceleration.z = imu_data.acc_z * g_to_ms2;
 
-  // set covariances from config for angular_velocity and linear_acceleration
+  // set covariances from config for angular_velocity and linear_acceleration, and reset orientation_covariance
   for(int i = 0; i < 9; i++)
   {
 	  imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
