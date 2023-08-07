@@ -150,8 +150,6 @@ class Lddc final {
   double publish_frq_;
   uint32_t publish_period_ns_;
   std::string frame_id_;
-  bool transform_imu_to_external_frame_;
-  std::string external_frame_id_;
   std::vector<double> angular_velocity_covariance_;
   std::vector<double> linear_acceleration_covariance_;
 
