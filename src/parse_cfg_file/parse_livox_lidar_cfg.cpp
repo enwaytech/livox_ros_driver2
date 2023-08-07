@@ -115,6 +115,16 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
         }
       }
     }
+    if (!config.HasMember("gyroscope_bias")) {
+      user_config.gyroscope_bias = {0.0, 0.0, 0.0};
+    } else {
+      auto &value = config["gyroscope_bias"];
+      if (!ParseGyroscopeBias(value, user_config.gyroscope_bias)) {
+        user_config.gyroscope_bias = {0.0, 0.0, 0.0};
+        std::cout << "failed to parse gyroscope bias parameters, ip: "
+                  << IpNumToString(user_config.handle) << std::endl;
+      }
+    }
     if (!config.HasMember("extrinsic_parameter")) {
       memset(&user_config.extrinsic_param, 0, sizeof(user_config.extrinsic_param));
     } else {
@@ -192,6 +202,27 @@ bool LivoxLidarConfigParser::ParseExtrinsics(const rapidjson::Value &value,
     param.z = 0;
   } else {
     param.z = static_cast<int32_t>(value["z"].GetInt());
+  }
+
+  return true;
+}
+
+bool LivoxLidarConfigParser::ParseGyroscopeBias(const rapidjson::Value &value,
+                                                GyroscopeBias& bias_param) {
+  if (!value.HasMember("x")) {
+    bias_param[0] = 0;
+  } else {
+    bias_param[0] = static_cast<float>(value["x"].GetFloat());
+  }
+  if (!value.HasMember("y")) {
+    bias_param[1] = 0;
+  } else {
+    bias_param[1] = static_cast<float>(value["y"].GetFloat());
+  }
+  if (!value.HasMember("z")) {
+    bias_param[2] = 0;
+  } else {
+    bias_param[2] = static_cast<float>(value["z"].GetFloat());
   }
 
   return true;
