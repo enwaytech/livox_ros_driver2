@@ -162,7 +162,6 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
     self->raw_packet_queue_.push_back(packet);
   }
     self->packet_condition_.notify_one();
-  }
 
   return;
 }
