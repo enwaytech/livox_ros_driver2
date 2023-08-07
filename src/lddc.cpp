@@ -205,7 +205,8 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
 void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
-    PublishImuData(p_queue, index, lidar->livox_config.frame_id, lidar->livox_config.external_frame_id);
+    PublishImuData(p_queue, index, lidar->livox_config.frame_id, lidar->livox_config.external_frame_id,
+                   lidar->livox_config.gyroscope_bias);
   }
 }
 
@@ -601,7 +602,8 @@ void Lddc::PublishPclData(const uint8_t index, const uint64_t timestamp, const P
   return;
 }
 
-void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, const std::string& lidar_frame_id)
+void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, const std::string& lidar_frame_id,
+                      const std::array<float, 3>& gyroscope_bias)
 {
   imu_msg.header.frame_id = lidar_frame_id + "_imu";
 
@@ -612,10 +614,10 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
 
-  // set angular velocity to data received from the IMU [in rad/s]
-  imu_msg.angular_velocity.x = imu_data.gyro_x;
-  imu_msg.angular_velocity.y = imu_data.gyro_y;
-  imu_msg.angular_velocity.z = imu_data.gyro_z;
+  // set angular velocity to data received from the IMU's gyroscope [in rad/s] and compensate for gyroscope bias
+  imu_msg.angular_velocity.x = imu_data.gyro_x - gyroscope_bias[0];
+  imu_msg.angular_velocity.y = imu_data.gyro_y - gyroscope_bias[1];
+  imu_msg.angular_velocity.z = imu_data.gyro_z - gyroscope_bias[2];
 
   // convert the linear acceleration from g's to m/s^2, following the ROS message specifications
   constexpr float g_to_ms2 = 9.80665;
@@ -666,7 +668,7 @@ void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& external_frame_id
 }
 
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id,
-                          std::optional<std::string> external_frame_id) {
+                          std::optional<std::string> external_frame_id, const std::array<float, 3>& gyroscope_bias) {
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -675,7 +677,7 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
 
   ImuMsg imu_msg;
   uint64_t timestamp;
-  InitImuMsg(imu_data, imu_msg, timestamp, lidar_frame_id);
+  InitImuMsg(imu_data, imu_msg, timestamp, lidar_frame_id, gyroscope_bias);
 
   if (external_frame_id)
   {
