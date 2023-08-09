@@ -114,15 +114,24 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
           user_config.external_frame_id = std::make_optional(static_cast<std::string>(config["external_frame_id"].GetString()));
         }
       }
-    }
-    if (!config.HasMember("gyroscope_bias")) {
+    if (!config.HasMember("enable_gyroscope_bias_compensation")) {
       user_config.gyroscope_bias = {0.0, 0.0, 0.0};
     } else {
-      auto &value = config["gyroscope_bias"];
-      if (!ParseGyroscopeBias(value, user_config.gyroscope_bias)) {
+      bool enable_gyroscope_bias_compensation = config["enable_gyroscope_bias_compensation"].GetBool();
+      if (!enable_gyroscope_bias_compensation) {
         user_config.gyroscope_bias = {0.0, 0.0, 0.0};
-        std::cout << "failed to parse gyroscope bias parameters, ip: "
-                  << IpNumToString(user_config.handle) << std::endl;
+      } else {
+        if (!config.HasMember("gyroscope_bias")) {
+          std::cout << "Error: 'gyroscope_bias' must be specified if 'enable_gyroscope_bias_compensation' is set to true" << std::endl;
+          return false;
+        }
+        auto &value = config["gyroscope_bias"];
+        if (!ParseGyroscopeBias(value, user_config.gyroscope_bias)) {
+          user_config.gyroscope_bias = {0.0, 0.0, 0.0};
+          std::cout << "failed to parse gyroscope bias parameters, ip: "
+                    << IpNumToString(user_config.handle) << std::endl;
+          return false;
+        }
       }
     }
     if (!config.HasMember("extrinsic_parameter")) {
