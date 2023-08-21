@@ -74,7 +74,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
       dust_filters_.emplace();
       for (size_t i = 0; i < kMaxSourceLidar; i++)
       {
-        dust_filters_->push_back(dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtl>{});
+        dust_filters_->push_back(dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtlt>{});
       }
     }
     else
@@ -240,18 +240,19 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       // Add measurement to dust filtering
       for (const auto& point : pkg.points)
       {
-        livox_ros::PCLLivoxPointXyzrtl livox_point;
+        livox_ros::PCLLivoxPointXyzrtlt livox_point;
         livox_point.x = point.x;
         livox_point.y = point.y;
         livox_point.z = point.z;
         livox_point.reflectivity = point.intensity;
         livox_point.tag = point.tag;
         livox_point.line = point.line;
+        livox_point.timestamp = static_cast<double>(point.offset_time);
         dust_filter.addMeasurement(livox_point);
       }
 
       // Get result cloud without dust
-      pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtl> dust_filtered_cloud = dust_filter.getFilteredPointCloud();
+      pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtlt> dust_filtered_cloud = dust_filter.getFilteredPointCloud();
       // Assemble PointCloud2
       cloud.width = dust_filtered_cloud.points.size();
       cloud.row_step = cloud.width * cloud.point_step;
@@ -265,23 +266,24 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       }
       cloud.header.stamp = ros::Time(timestamp / 1000000000.0);
 
-      std::vector<LivoxPointXyzrtl> points;
+      std::vector<LivoxPointXyzrtlt> points;
       points.reserve(dust_filtered_cloud.points.size());
 
       for (size_t i = 0; i < dust_filtered_cloud.points.size(); ++i)
       {
-        LivoxPointXyzrtl point;
+        LivoxPointXyzrtlt point;
         point.x = dust_filtered_cloud.points.at(i).x;
         point.y = dust_filtered_cloud.points.at(i).y;
         point.z = dust_filtered_cloud.points.at(i).z;
         point.reflectivity = dust_filtered_cloud.points.at(i).reflectivity;
         point.tag = dust_filtered_cloud.points.at(i).tag;
         point.line = dust_filtered_cloud.points.at(i).line;
+        point.timestamp = dust_filtered_cloud.points.at(i).timestamp;
         points.emplace_back(std::move(point));
       }
 
-      cloud.data.resize(points.size() * sizeof(LivoxPointXyzrtl));
-      memcpy(cloud.data.data(), points.data(), points.size() * sizeof(LivoxPointXyzrtl));
+      cloud.data.resize(points.size() * sizeof(LivoxPointXyzrtlt));
+      memcpy(cloud.data.data(), points.data(), points.size() * sizeof(LivoxPointXyzrtlt));
     }
     else
     {
@@ -342,18 +344,19 @@ void Lddc::PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string
       // Add measurement to dust filtering
       for (const auto& point : pkg.points)
       {
-        livox_ros::PCLLivoxPointXyzrtl livox_point;
+        livox_ros::PCLLivoxPointXyzrtlt livox_point;
         livox_point.x = point.x;
         livox_point.y = point.y;
         livox_point.z = point.z;
         livox_point.reflectivity = point.intensity;
         livox_point.tag = point.tag;
         livox_point.line = point.line;
+        livox_point.timestamp = static_cast<double>(point.offset_time);
         dust_filter.addMeasurement(livox_point);
       }
 
       // Get result cloud without dust
-      pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtl> dust_filtered_cloud = dust_filter.getFilteredPointCloud();
+      pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtlt> dust_filtered_cloud = dust_filter.getFilteredPointCloud();
       cloud.width = dust_filtered_cloud.points.size();
       for (size_t i = 0; i < dust_filtered_cloud.points.size(); ++i)
       {
