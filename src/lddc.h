@@ -148,7 +148,7 @@ class Lddc final {
 #ifdef BUILDING_ROS1
   bool enable_lidar_bag_;
   bool enable_imu_bag_;
-  std::optional<std::vector<dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtl>>> dust_filters_;
+  std::optional<std::vector<dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtlt>>> dust_filters_;
   PublisherPtr private_pub_[kMaxSourceLidar];
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];

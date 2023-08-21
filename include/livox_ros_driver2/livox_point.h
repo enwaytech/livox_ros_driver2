@@ -36,7 +36,8 @@ typedef struct {
   float reflectivity; /**< Reflectivity   */
   uint8_t tag;        /**< Livox point tag   */
   uint8_t line;       /**< Laser line id     */
-} LivoxPointXyzrtl;
+  double timestamp;   /**< Timestamp of point*/
+} LivoxPointXyzrtlt;
 
 #pragma pack()
 
