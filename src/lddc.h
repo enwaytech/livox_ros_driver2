@@ -77,9 +77,9 @@ class DriverNode;
 class Lddc final {
  public:
 #ifdef BUILDING_ROS1
-  Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-      std::string &frame_id, const std::vector<double>& angular_velocity_covariance,
-      const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter);
+  Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
+       const std::vector<double>& angular_velocity_covariance,
+       const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter);
 #elif defined BUILDING_ROS2
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
       std::string &frame_id);

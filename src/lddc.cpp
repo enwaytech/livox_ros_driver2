@@ -47,8 +47,8 @@ namespace livox_ros
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
-           const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
-           bool lidar_bag, bool imu_bag, bool dust_filter)
+           const std::vector<double>& angular_velocity_covariance,
+           const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
