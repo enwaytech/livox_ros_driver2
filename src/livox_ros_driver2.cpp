@@ -61,7 +61,6 @@ int main(int argc, char **argv) {
   bool lidar_bag = true;
   bool imu_bag   = false;
   bool dust_filter = false;
-
   std::vector<double> angular_velocity_covariance;
   std::vector<double> linear_acceleration_covariance;
 
@@ -91,7 +90,7 @@ int main(int argc, char **argv) {
   /** Lidar data distribute control and lidar data source set */
   livox_node.lddc_ptr_ = std::make_unique<Lddc>(xfer_format, multi_topic, data_src, output_type, publish_freq, frame_id,
                                                 angular_velocity_covariance, linear_acceleration_covariance,
-                                                lidar_bag,imu_bag, dust_filter);
+                                                lidar_bag, imu_bag, dust_filter);
   livox_node.lddc_ptr_->SetRosNode(&livox_node);
 
   if (data_src == kSourceRawLidar) {
