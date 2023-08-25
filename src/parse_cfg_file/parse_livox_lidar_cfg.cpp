@@ -110,10 +110,10 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
         if (!config.HasMember("external_frame_id")) {
           std::cout << "Error: 'external_frame_id' must be specified if 'transform_imu_to_external_frame' is set to true" << std::endl;
           return false;
+        } else {
+          user_config.external_frame_id = std::make_optional(static_cast<std::string>(config["external_frame_id"].GetString()));
         }
-        user_config.external_frame_id = std::make_optional(static_cast<std::string>(config["external_frame_id"].GetString()));
       }
-    }
     if (!config.HasMember("enable_gyroscope_bias_compensation")) {
       user_config.gyroscope_bias = {0.0, 0.0, 0.0};
     } else {
