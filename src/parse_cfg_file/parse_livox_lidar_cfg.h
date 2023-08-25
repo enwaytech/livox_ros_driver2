@@ -37,7 +37,7 @@
 #include <vector>
 
 namespace livox_ros {
-
+  
 class LivoxLidarConfigParser {
  public:
   explicit LivoxLidarConfigParser(const std::string& path)  : path_(path) {}
@@ -49,7 +49,6 @@ class LivoxLidarConfigParser {
   bool ParseUserConfigs(const rapidjson::Document &doc,
                          std::vector<UserLivoxLidarConfig> &user_configs);
   bool ParseExtrinsics(const rapidjson::Value &value, ExtParameter &param);
-  bool ParseGyroscopeBias(const rapidjson::Value &value, GyroscopeBias& bias_param);
   bool ParseFilterParameters(const rapidjson::Value &value, FilterParameter &param);
   const std::string path_;
 };

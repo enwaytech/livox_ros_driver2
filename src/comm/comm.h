@@ -221,8 +221,6 @@ typedef struct {
   RotationMatrix rotation;
 } ExtParameterDetailed;
 
-typedef std::array<float, 3> GyroscopeBias; /**< x, y, z gyroscope bias in the IMU frame, unit: rad/s. */
-
 typedef struct {
   LidarProtoType lidar_type;
   uint32_t handle;
@@ -280,7 +278,6 @@ typedef struct {
   int8_t dual_emit_en;
   std::string frame_id;
   std::optional<std::string> external_frame_id;
-  GyroscopeBias gyroscope_bias;
   ExtParameter extrinsic_param;
   bool enable_yaw_filter;
   FilterParameter filter_param;
