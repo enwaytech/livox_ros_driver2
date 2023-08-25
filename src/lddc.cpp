@@ -661,8 +661,8 @@ void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& external_frame_id
 
   tf2::doTransform(imu_msg.orientation, imu_msg.orientation, transform);
 
-  // doTransform(geometry_msgs::Vector3) doesn't take into account the translation
-  //   which is correct for the linear acceleration and angular velocity vectors as they are vectors in free space.
+  // doTransform for vector3 doesn't take into account the translation
+  //  - which is correct for the linear acceleration and angular velocity vectors
   tf2::doTransform(imu_msg.angular_velocity, imu_msg.angular_velocity, transform);
   tf2::doTransform(imu_msg.linear_acceleration, imu_msg.linear_acceleration, transform);
 }
