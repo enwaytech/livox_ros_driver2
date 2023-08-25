@@ -39,7 +39,6 @@ find_package(catkin REQUIRED COMPONENTS
   dust_filter_livox
   nodelet
   pcl_conversions
-  tf2
 )
 
 ## Find pcl lib
