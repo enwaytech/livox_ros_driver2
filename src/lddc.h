@@ -30,8 +30,6 @@
 
 #include "driver_node.h"
 #include "lds.h"
-
-#include <tf2_ros/transform_listener.h>
 #include <string>
 #include <optional>
 
@@ -80,9 +78,8 @@ class Lddc final {
  public:
 #ifdef BUILDING_ROS1
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-      std::string &frame_id, bool transform_imu_to_body_aligned_frame, const std::string& body_aligned_frame_id,
-      const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
-      bool lidar_bag, bool imu_bag, bool dust_filter);
+      std::string &frame_id, const std::vector<double>& angular_velocity_covariance,
+      const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter);
 #elif defined BUILDING_ROS2
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
       std::string &frame_id);
@@ -148,8 +145,6 @@ class Lddc final {
   double publish_frq_;
   uint32_t publish_period_ns_;
   std::string frame_id_;
-  bool transform_imu_to_body_aligned_frame_;
-  std::string body_aligned_frame_id_;
   std::vector<double> angular_velocity_covariance_;
   std::vector<double> linear_acceleration_covariance_;
 
@@ -162,9 +157,6 @@ class Lddc final {
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
   rosbag::Bag *bag_;
-
-  tf2_ros::Buffer tf_buffer_;
-  tf2_ros::TransformListener tf_listener_;
 
 #elif defined BUILDING_ROS2
   PublisherPtr private_pub_[kMaxSourceLidar];
