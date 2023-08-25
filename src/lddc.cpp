@@ -205,7 +205,7 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
 void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
-    PublishImuData(p_queue, index, lidar->livox_config.frame_id, lidar->livox_config.external_frame_id);
+    PublishImuData(p_queue, index, lidar->livox_config.frame_id, lidar->livox_config.body_aligned_frame_id);
   }
 }
 
@@ -636,9 +636,9 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.orientation_covariance[0] = -1;
 }
 
-void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& external_frame_id)
+void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& body_aligned_frame_id)
 {
-  if (imu_msg.header.frame_id == external_frame_id)
+  if (imu_msg.header.frame_id == body_aligned_frame_id)
   {
     return;
   }
@@ -646,7 +646,7 @@ void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& external_frame_id
   geometry_msgs::TransformStamped transform;
   try
   {
-    transform = tf_buffer_.lookupTransform(external_frame_id, imu_msg.header.frame_id, imu_msg.header.stamp,
+    transform = tf_buffer_.lookupTransform(body_aligned_frame_id, imu_msg.header.frame_id, imu_msg.header.stamp,
                                             ros::Duration(0));
   }
   catch (tf2::TransformException &ex)
@@ -655,7 +655,7 @@ void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& external_frame_id
     return;
   }
 
-  imu_msg.header.frame_id = external_frame_id;
+  imu_msg.header.frame_id = body_aligned_frame_id;
 
   tf2::doTransform(imu_msg.orientation, imu_msg.orientation, transform);
 
@@ -666,7 +666,7 @@ void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& external_frame_id
 }
 
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id,
-                          std::optional<std::string> external_frame_id) {
+                          std::optional<std::string> body_aligned_frame_id) {
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -677,9 +677,9 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
   uint64_t timestamp;
   InitImuMsg(imu_data, imu_msg, timestamp, lidar_frame_id);
 
-  if (external_frame_id)
+  if (body_aligned_frame_id)
   {
-    TransformImuMsg(imu_msg, external_frame_id.value());
+    TransformImuMsg(imu_msg, body_aligned_frame_id.value());
   }
 
 #ifdef BUILDING_ROS1
