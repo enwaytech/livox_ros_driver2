@@ -31,9 +31,6 @@
 #include <math.h>
 #include <stdint.h>
 #include <string>
-#include <tf2/LinearMath/Transform.h>
-#include <tf2/convert.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include "livox_ros_driver2/livox_ros_types.h"
 #include "livox_ros_driver2/ros_headers.h"
@@ -49,6 +46,7 @@ namespace livox_ros
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
+           bool transform_imu_to_body_aligned_frame, const std::string& body_aligned_frame_id,
            const std::vector<double>& angular_velocity_covariance, const std::vector<double>& linear_acceleration_covariance,
            bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
@@ -57,6 +55,8 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
       output_type_(output_type),
       publish_frq_(frq),
       frame_id_(frame_id),
+      transform_imu_to_body_aligned_frame_(transform_imu_to_body_aligned_frame),
+      body_aligned_frame_id_(body_aligned_frame_id),
       angular_velocity_covariance_(angular_velocity_covariance),
       linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
@@ -204,7 +204,7 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
 void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
-    PublishImuData(p_queue, index, lidar->livox_config.frame_id, lidar->livox_config.body_aligned_frame_id);
+    PublishImuData(p_queue, index, lidar->livox_config.frame_id);
   }
 }
 
@@ -615,6 +615,27 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.linear_acceleration.y = imu_data.acc_y * g_to_ms2;
   imu_msg.linear_acceleration.z = imu_data.acc_z * g_to_ms2;
 
+  if (transform_imu_to_body_aligned_frame_)
+  {
+    geometry_msgs::TransformStamped transform;
+    try
+    {
+      // Transform from the original frame to "base_link" or another target frame
+      // transform = tf_buffer_.lookupTransform(body_aligned_frame_id_, imu_msg.header.frame_id, imu_msg.header.stamp,
+      //                                        ros::Duration(0.1));
+      tf_buffer_.transform(imu_msg, imu_msg, body_aligned_frame_id_); // TODO test
+
+    }
+    catch (tf2::TransformException &ex)
+    {
+      ROS_ERROR_STREAM_THROTTLE(1.0, ex.what());
+      return;
+    }
+
+  // Perform the transformation
+  // tf2::doTransform(transformed_imu, transformed_imu, transformStamped);
+  }
+
   // set covariances from config for angular_velocity and linear_acceleration, and reset orientation_covariance
   for(int i = 0; i < 9; i++)
   {
@@ -628,37 +649,7 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.orientation_covariance[0] = -1;
 }
 
-void Lddc::TransformImuMsg(ImuMsg& imu_msg, const std::string& body_aligned_frame_id)
-{
-  if (imu_msg.header.frame_id == body_aligned_frame_id)
-  {
-    return;
-  }
-
-  geometry_msgs::TransformStamped transform;
-  try
-  {
-    transform = tf_buffer_.lookupTransform(body_aligned_frame_id, imu_msg.header.frame_id, imu_msg.header.stamp,
-                                            ros::Duration(0));
-  }
-  catch (tf2::TransformException &ex)
-  {
-    ROS_ERROR_STREAM_THROTTLE(1.0, ex.what());
-    return;
-  }
-
-  imu_msg.header.frame_id = body_aligned_frame_id;
-
-  tf2::doTransform(imu_msg.orientation, imu_msg.orientation, transform);
-
-  // doTransform for vector3 doesn't take into account the translation
-  //  - which is correct for the linear acceleration and angular velocity vectors
-  tf2::doTransform(imu_msg.angular_velocity, imu_msg.angular_velocity, transform);
-  tf2::doTransform(imu_msg.linear_acceleration, imu_msg.linear_acceleration, transform);
-}
-
-void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id,
-                          std::optional<std::string> body_aligned_frame_id) {
+void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id) {
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -668,11 +659,6 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
   ImuMsg imu_msg;
   uint64_t timestamp;
   InitImuMsg(imu_data, imu_msg, timestamp, lidar_frame_id);
-
-  if (body_aligned_frame_id)
-  {
-    TransformImuMsg(imu_msg, body_aligned_frame_id.value());
-  }
 
 #ifdef BUILDING_ROS1
   PublisherPtr publisher_ptr = GetCurrentImuPublisher(index);

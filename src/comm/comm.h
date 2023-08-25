@@ -31,7 +31,6 @@
 #include <stdlib.h>
 
 #include <iostream>
-#include <optional>
 #include <string>
 #include <vector>
 #include <memory>
@@ -80,7 +79,7 @@ constexpr uint32_t kMaxBufferSize = 0x8000;  // 32k bytes
 /** Device Line Number **/
 const uint8_t kLineNumberDefault = 1;
 const uint8_t kLineNumberMid360 = 4;
-const uint8_t kLineNumberHAP = 6;
+const uint8_t kLineNumberHAP = 6;    
 
 // SDK related
 typedef enum {
@@ -278,7 +277,6 @@ typedef struct {
   int32_t blind_spot_set;
   int8_t dual_emit_en;
   std::string frame_id;
-  std::optional<std::string> body_aligned_frame_id;
   ExtParameter extrinsic_param;
   bool enable_yaw_filter;
   FilterParameter filter_param;
