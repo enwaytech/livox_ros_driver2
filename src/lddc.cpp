@@ -614,9 +614,9 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   // set covariances from config for angular_velocity and linear_acceleration, and reset orientation_covariance
   for(int i = 0; i < 9; i++)
   {
-	  imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
-	  imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
-	  imu_msg.orientation_covariance[i] = 0;
+    imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
+    imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
+    imu_msg.orientation_covariance[i] = 0;
   }
 
   // IMU does not provide orientation data, so leave imu_msg.orientation with all 0 and set element 0 of the associated
