@@ -262,7 +262,7 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
 
       if (!pkg.points.empty())
       {
-        timestamp = pkg.base_time + pkg.points[0].offset_time;
+        timestamp = pkg.base_time;
       }
       cloud.header.stamp = ros::Time(timestamp / 1000000000.0);
 
