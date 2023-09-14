@@ -107,6 +107,7 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
         memset(&user_config.extrinsic_param, 0, sizeof(user_config.extrinsic_param));
         std::cout << "failed to parse extrinsic parameters, ip: "
                   << IpNumToString(user_config.handle) << std::endl;
+        return false;
       }
     }
     if (!config.HasMember("enable_yaw_filter")) {
@@ -114,14 +115,19 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
     } else {
       user_config.enable_yaw_filter = static_cast<bool>(config["enable_yaw_filter"].GetBool());
     }
-    if (!config.HasMember("filter_parameter") || !user_config.enable_yaw_filter) {
+    if (!user_config.enable_yaw_filter) {
       user_config.filter_param = FilterParameter{};
     } else {
+      if (!config.HasMember("filter_parameter")) {
+        std::cout << "Error: 'filter_parameter' must be specified if 'enable_yaw_filter' is set to true" << std::endl;
+        return false;
+      }
       auto &value = config["filter_parameter"];
       if (!ParseFilterParameters(value, user_config.filter_param)) {
         user_config.filter_param = FilterParameter{};
         std::cout << "failed to parse filter parameters, ip: "
                   << IpNumToString(user_config.handle) << std::endl;
+        return false;
       }
     }
     user_config.set_bits = 0;

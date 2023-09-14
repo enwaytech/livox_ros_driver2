@@ -26,7 +26,6 @@
 #include "comm/comm.h"
 #include "comm/ldq.h"
 
-
 #include <inttypes.h>
 #include <iostream>
 #include <iomanip>
@@ -47,14 +46,17 @@ namespace livox_ros
 
 /** Lidar Data Distribute Control--------------------------------------------*/
 #ifdef BUILDING_ROS1
-Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
-    double frq, std::string &frame_id, bool lidar_bag, bool imu_bag, bool dust_filter)
+Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
+           const std::vector<double>& angular_velocity_covariance,
+           const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
       output_type_(output_type),
       publish_frq_(frq),
       frame_id_(frame_id),
+      angular_velocity_covariance_(angular_velocity_covariance),
+      linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
       enable_imu_bag_(imu_bag) {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
@@ -166,7 +168,7 @@ void Lddc::DistributeImuData(void) {
     std::cout << "DistributeImuData is RequestExit" << std::endl;
     return;
   }
-  
+
   lds_->imu_semaphore_.Wait();
   for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
     uint32_t lidar_id = i;
@@ -546,7 +548,7 @@ void Lddc::InitPclMsg(const StoragePacket& pkg, PointCloud& cloud, uint64_t& tim
   cloud.header.stamp = timestamp / 1000.0;  // to pcl ros time stamp
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
-            << "please check code logic" 
+            << "please check code logic"
             << std::endl;
 #endif
   return;
@@ -571,7 +573,7 @@ void Lddc::FillPointsToPclMsg(const StoragePacket& pkg, PointCloud& pcl_msg) {
   }
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
-            << "please check code logic" 
+            << "please check code logic"
             << std::endl;
 #endif
   return;
@@ -589,14 +591,15 @@ void Lddc::PublishPclData(const uint8_t index, const uint64_t timestamp, const P
   }
 #elif defined BUILDING_ROS2
   std::cout << "warning: pcl::PointCloud is not supported in ROS2, "
-            << "please check code logic" 
+            << "please check code logic"
             << std::endl;
 #endif
   return;
 }
 
-void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, const std::string& frame_id) {
-  imu_msg.header.frame_id = frame_id;
+void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, const std::string& lidar_frame_id)
+{
+  imu_msg.header.frame_id = lidar_frame_id + "_imu";
 
   timestamp = imu_data.time_stamp;
 #ifdef BUILDING_ROS1
@@ -605,15 +608,31 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
 
+  // set angular velocity to data received from the IMU [in rad/s]
   imu_msg.angular_velocity.x = imu_data.gyro_x;
   imu_msg.angular_velocity.y = imu_data.gyro_y;
   imu_msg.angular_velocity.z = imu_data.gyro_z;
-  imu_msg.linear_acceleration.x = imu_data.acc_x;
-  imu_msg.linear_acceleration.y = imu_data.acc_y;
-  imu_msg.linear_acceleration.z = imu_data.acc_z;
+
+  // convert the linear acceleration from g's to m/s^2, following the ROS message specifications
+  constexpr float g_to_ms2 = 9.80665;
+  imu_msg.linear_acceleration.x = imu_data.acc_x * g_to_ms2;
+  imu_msg.linear_acceleration.y = imu_data.acc_y * g_to_ms2;
+  imu_msg.linear_acceleration.z = imu_data.acc_z * g_to_ms2;
+
+  // set covariances from config for angular_velocity and linear_acceleration, and reset orientation_covariance
+  for(int i = 0; i < 9; i++)
+  {
+    imu_msg.angular_velocity_covariance[i] = angular_velocity_covariance_[i];
+    imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
+    imu_msg.orientation_covariance[i] = 0;
+  }
+
+  // IMU does not provide orientation data, so leave imu_msg.orientation with all 0 and set element 0 of the associated
+  // covariance matrix to -1 (following the ROS message specifications)
+  imu_msg.orientation_covariance[0] = -1;
 }
 
-void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& frame_id) {
+void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id) {
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -622,7 +641,7 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
 
   ImuMsg imu_msg;
   uint64_t timestamp;
-  InitImuMsg(imu_data, imu_msg, timestamp, frame_id);
+  InitImuMsg(imu_data, imu_msg, timestamp, lidar_frame_id);
 
 #ifdef BUILDING_ROS1
   PublisherPtr publisher_ptr = GetCurrentImuPublisher(index);
