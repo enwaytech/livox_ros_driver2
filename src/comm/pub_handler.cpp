@@ -305,7 +305,7 @@ uint64_t LidarPubHandler::GetLidarBaseTime() {
   return points_clouds_.at(0).offset_time;
 }
 
-void LidarPubHandler::GetLidarPointClouds(std::vector<PointXyzlt>& points_clouds) {
+void LidarPubHandler::GetLidarPointClouds(std::vector<PointXyzltrtp>& points_clouds) {
   std::lock_guard<std::mutex> lock(mutex_);
   points_clouds.swap(points_clouds_);
 }
@@ -413,7 +413,7 @@ void LidarPubHandler::SetLidarsFilterParam(LidarFilterParameter param) {
 
 void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
   LivoxLidarCartesianHighRawPoint* raw = (LivoxLidarCartesianHighRawPoint*)pkt.raw_data.data();
-  PointXyzlt point = {};
+  PointXyzltrtp point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
     if (pkt.extrinsic_enable) {
       point.x = raw[i].x / 1000.0;
@@ -430,8 +430,8 @@ void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
                 raw[i].y * extrinsic_.rotation[2][1] +
                 raw[i].z * extrinsic_.rotation[2][2] + extrinsic_.trans[2]) / 1000.0;
     }
-
-    if (FilterYawPoint(point))
+    point.range = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+    if (FilterYawPoint(point) && point.range != 0.0f)
     {
       continue;
     }
@@ -447,7 +447,7 @@ void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
 
 void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {
   LivoxLidarCartesianLowRawPoint* raw = (LivoxLidarCartesianLowRawPoint*)pkt.raw_data.data();
-  PointXyzlt point = {};
+  PointXyzltrtp point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
     if (pkt.extrinsic_enable) {
       point.x = raw[i].x / 100.0;
@@ -465,7 +465,9 @@ void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {
                 raw[i].z * extrinsic_.rotation[2][2] + extrinsic_.trans[2]) / 100.0;
     }
 
-    if (FilterYawPoint(point))
+    point.range = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+
+    if (FilterYawPoint(point) && point.range != 0.0f)
     {
       continue;
     }
@@ -481,7 +483,7 @@ void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {
 
 void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
   LivoxLidarSpherPoint* raw = (LivoxLidarSpherPoint*)pkt.raw_data.data();
-  PointXyzlt point = {};
+  PointXyzltrtp point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
     double radius = raw[i].depth / 1000.0;
     double theta = raw[i].theta / 100.0 / 180 * PI;
@@ -505,7 +507,18 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
                 src_z * extrinsic_.rotation[2][2] + (extrinsic_.trans[2] / 1000.0);
     }
 
-    if (FilterYawPoint(point))
+    if (radius == 0.0)
+    {
+      PointXyzltrtp ray_no_return = {};
+      ray_no_return.x = sin(theta) * cos(phi);
+      ray_no_return.y = sin(theta) * sin(phi);
+      ray_no_return.z = cos(theta);
+      if (FilterYawPoint(ray_no_return))
+      {
+        continue;
+      }
+    }
+    else if (FilterYawPoint(point))
     {
       continue;
     }
@@ -514,20 +527,34 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
     point.line = i % pkt.line_num;
     point.tag = raw[i].tag;
     point.offset_time = pkt.time_stamp + i * pkt.point_interval;
+    point.range = radius;
+    point.theta = theta;
+    point.phi = phi;
 
     std::lock_guard<std::mutex> lock(mutex_);
     points_clouds_.push_back(point);
+  /*
+    if (radius == 0.0f)
+    {
+      PointRtp invalid_point = {};
+      invalid_point.range = radius;
+      invalid_point.theta = theta;
+      invalid_point.phi = phi;
+      //invalid_point.offset_time = pkt.time_stamp + i * pkt.point_interval;
+      //points_invalid_clouds_.push_back(invalid_point);
+    }
+*/
   }
 }
 
-bool LidarPubHandler::FilterYawPoint(const PointXyzlt& point)
+bool LidarPubHandler::FilterYawPoint(const PointXyzltrtp& point)
 {
   if (!is_set_filter_params_)
   {
     return false;
   }
   // rotation to base frame
-  PointXyzlt base_point = {};
+  PointXyzltrtp base_point = {};
   base_point.x = point.x * filter_rotation_[0][0] +
                   point.y * filter_rotation_[0][1] +
                   point.z * filter_rotation_[0][2];
