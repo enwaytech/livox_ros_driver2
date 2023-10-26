@@ -156,13 +156,22 @@ typedef struct {
   uint8_t tag;
   uint8_t line;
   uint64_t offset_time;
-} PointXyzlt;
+  float range;
+  float theta;
+  float phi;
+} PointXyzltrtp;
+
+typedef struct {
+  float range;
+  float theta;
+  float phi;
+} PointRtp;
 
 typedef struct {
   uint32_t handle;
   uint8_t lidar_type; ////refer to LivoxLidarType
   uint32_t points_num;
-  PointXyzlt* points;
+  PointXyzltrtp* points;
 } PointPacket;
 
 typedef struct {
@@ -178,7 +187,7 @@ typedef struct {
   uint32_t handle;
   uint64_t base_time;
   uint32_t points_num;
-  std::vector<PointXyzlt> points;
+  std::vector<PointXyzltrtp> points;
 } StoragePacket;
 
 typedef struct {

@@ -49,7 +49,7 @@ class LidarPubHandler {
   void PointCloudProcess(RawPacket& pkt);
   void SetLidarsExtParam(LidarExtParameter param);
   void SetLidarsFilterParam(LidarFilterParameter param);
-  void GetLidarPointClouds(std::vector<PointXyzlt>& points_clouds);
+  void GetLidarPointClouds(std::vector<PointXyzltrtp>& points_clouds);
 
   uint64_t GetRecentTimeStamp();
   uint32_t GetLidarPointCloudsSize();
@@ -60,8 +60,8 @@ class LidarPubHandler {
   void ProcessCartesianHighPoint(RawPacket & pkt);
   void ProcessCartesianLowPoint(RawPacket & pkt);
   void ProcessSphericalPoint(RawPacket & pkt);
-  bool FilterYawPoint(const PointXyzlt& point);
-  std::vector<PointXyzlt> points_clouds_;
+  bool FilterYawPoint(const PointXyzltrtp& point);
+  std::vector<PointXyzltrtp> points_clouds_;
   ExtParameterDetailed extrinsic_ = {
     {0, 0, 0},
     {
@@ -140,7 +140,8 @@ class PubHandler {
   TimePoint last_pub_time_;
 
   std::map<uint32_t, std::unique_ptr<LidarPubHandler>> lidar_process_handlers_;
-  std::map<uint32_t, std::vector<PointXyzlt>> points_;
+  std::map<uint32_t, std::vector<PointXyzltrtp>> points_;
+  std::map<uint32_t, std::vector<PointRtp>> invalid_points_;
   std::map<uint32_t, LidarExtParameter> lidar_extrinsics_;
   std::map<uint32_t, LidarFilterParameter> lidar_filters_;
   static std::atomic<bool> is_timestamp_sync_;
