@@ -533,17 +533,16 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
 
     std::lock_guard<std::mutex> lock(mutex_);
     points_clouds_.push_back(point);
-  /*
-    if (radius == 0.0f)
+
+    /*if (radius == 0.0f)
     {
       PointRtp invalid_point = {};
       invalid_point.range = radius;
       invalid_point.theta = theta;
       invalid_point.phi = phi;
       //invalid_point.offset_time = pkt.time_stamp + i * pkt.point_interval;
-      //points_invalid_clouds_.push_back(invalid_point);
-    }
-*/
+      points_invalid_clouds_.push_back(invalid_point);
+    }*/
   }
 }
 
