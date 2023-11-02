@@ -301,7 +301,7 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
     {
       sensor_msgs::PointCloud2 invalid_points_cloud;
       //printf("Publish invalid points.\n");
-      printf("Points in pkg: %u", pkg.points.size());
+      //printf("Points in pkg: %u", pkg.points.size());
       InitPointcloud2InvalidPointsMsg(pkg, invalid_points_cloud, timestamp, frame_id);
       PublishPointcloud2InvalidPointsData(index, timestamp, invalid_points_cloud);  
     }
@@ -499,10 +499,11 @@ void Lddc::InitPointcloud2InvalidPointsMsg(const StoragePacket& pkg, PointCloud2
       point.range = pkg.points[i].range;
       point.thetha = pkg.points[i].theta;
       point.phi = pkg.points[i].phi;
+      point.tag = pkg.points[i].tag;
       points.push_back(std::move(point));
     }
   }
-  printf("Points %u\n", points.size());
+  //printf("Points %u\n", points.size());
   cloud.width = points.size();
   cloud.row_step = cloud.width * cloud.point_step;
   cloud.data.resize(points.size() * sizeof(LivoxPointRtp));
@@ -513,7 +514,7 @@ void Lddc::InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::
   cloud.header.frame_id.assign(frame_id);
   cloud.height = 1;
   cloud.width = 0;
-  cloud.fields.resize(6);
+  cloud.fields.resize(7);
   cloud.fields[0].offset = 0;
   cloud.fields[0].name = "x";
   cloud.fields[0].count = 1;
@@ -538,6 +539,10 @@ void Lddc::InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::
   cloud.fields[5].name = "phi";
   cloud.fields[5].count = 1;
   cloud.fields[5].datatype = PointField::FLOAT32;
+  cloud.fields[6].offset = 24;
+  cloud.fields[6].name = "tag";
+  cloud.fields[6].count = 1;
+  cloud.fields[6].datatype = PointField::UINT8;
   cloud.point_step = sizeof(LivoxPointRtp);
 }
 
