@@ -49,6 +49,7 @@ class LidarPubHandler {
   void PointCloudProcess(RawPacket& pkt);
   void SetLidarsExtParam(LidarExtParameter param);
   void SetLidarsFilterParam(LidarFilterParameter param);
+  void SetLidarsFilterRaysParam(LidarFilterRaysParameter param);
   void GetLidarPointClouds(std::vector<PointXyzltrtp>& points_clouds);
 
   uint64_t GetRecentTimeStamp();
@@ -61,6 +62,7 @@ class LidarPubHandler {
   void ProcessCartesianLowPoint(RawPacket & pkt);
   void ProcessSphericalPoint(RawPacket & pkt);
   bool FilterYawPoint(const PointXyzltrtp& point);
+  bool FilterRay(const PointXyzltrtp& point);
   std::vector<PointXyzltrtp> points_clouds_;
   ExtParameterDetailed extrinsic_ = {
     {0, 0, 0},
@@ -81,6 +83,12 @@ class LidarPubHandler {
   std::mutex mutex_;
   std::atomic_bool is_set_extrinsic_params_;
   std::atomic_bool is_set_filter_params_;
+
+  float filter_rays_yaw_start_;
+  float filter_rays_yaw_end_;
+  float filter_rays_pitch_start_;
+  float filter_rays_pitch_end_;
+  std::atomic_bool is_set_filter_rays_params_;
 };
   
 class PubHandler {
@@ -103,6 +111,9 @@ class PubHandler {
 
   void AddLidarsFilterParam(LidarFilterParameter& filter_param);
   void ClearAllLidarsFilterParams();
+
+  void AddLidarsFilterRaysParam(LidarFilterRaysParameter& filter_rays_param);
+  void ClearAllLidarsFilterRaysParams();
 
   void SetImuDataCallback(ImuDataCallback cb, void* client_data);
 
@@ -144,6 +155,7 @@ class PubHandler {
   std::map<uint32_t, std::vector<PointRtp>> invalid_points_;
   std::map<uint32_t, LidarExtParameter> lidar_extrinsics_;
   std::map<uint32_t, LidarFilterParameter> lidar_filters_;
+  std::map<uint32_t, LidarFilterRaysParameter> lidar_rays_filters_;
   static std::atomic<bool> is_timestamp_sync_;
   uint16_t lidar_listen_id_ = 0;
 };
