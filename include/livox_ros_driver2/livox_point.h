@@ -46,6 +46,7 @@ typedef struct {
   float thetha;       /**< Theta angle [rad]*/
   float phi;          /**< Phi angle [rad]*/
   uint8_t tag;
+  float intensity;
 } LivoxPointRtp;
 #pragma pack()
 
