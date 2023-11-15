@@ -280,6 +280,9 @@ void PubHandler::RawDataProcess() {
     if (lidar_filters_.find(id) != lidar_filters_.end()) {
         lidar_process_handlers_[id]->SetLidarsFilterParam(lidar_filters_[id]);
     }
+    if (lidar_rays_filters_.find(id) != lidar_rays_filters_.end()) {
+        lidar_process_handlers_[id]->SetLidarsFilterRaysParam(lidar_rays_filters_[id]);
+    }
     process_handler->PointCloudProcess(raw_data);
     CheckTimer(id);
   }
@@ -420,13 +423,6 @@ void LidarPubHandler::SetLidarsFilterParam(LidarFilterParameter param) {
   filter_yaw_start_ = param.param.filter_yaw_start * PI / 180.0;
   filter_yaw_end_ = param.param.filter_yaw_end * PI / 180.0;
   is_set_filter_params_ = true;
-
-  filter_rays_yaw_start_ = param.param.filter_yaw_start * PI / 180.0;
-  filter_rays_yaw_end_ = param.param.filter_yaw_start * PI / 180.0;
-  filter_rays_pitch_start_ = param.param.filter_yaw_start * PI / 180.0;
-  filter_rays_pitch_end_ = param.param.filter_yaw_start * PI / 180.0;
-  is_set_filter_rays_params_ = true;
-
 }
 
 void LidarPubHandler::SetLidarsFilterRaysParam(LidarFilterRaysParameter param) {
@@ -440,20 +436,22 @@ void LidarPubHandler::SetLidarsFilterRaysParam(LidarFilterRaysParameter param) {
   double sin_pitch = sin(static_cast<double>(param.transform.pitch));
   double sin_yaw = sin(static_cast<double>(param.transform.yaw));
 
-  filter_rotation_[0][0] = cos_pitch * cos_yaw;
-  filter_rotation_[0][1] = sin_roll * sin_pitch * cos_yaw - cos_roll * sin_yaw;
-  filter_rotation_[0][2] = cos_roll * sin_pitch * cos_yaw + sin_roll * sin_yaw;
+  filter_rays_rotation_[0][0] = cos_pitch * cos_yaw;
+  filter_rays_rotation_[0][1] = sin_roll * sin_pitch * cos_yaw - cos_roll * sin_yaw;
+  filter_rays_rotation_[0][2] = cos_roll * sin_pitch * cos_yaw + sin_roll * sin_yaw;
 
-  filter_rotation_[1][0] = cos_pitch * sin_yaw;
-  filter_rotation_[1][1] = sin_roll * sin_pitch * sin_yaw + cos_roll * cos_yaw;
-  filter_rotation_[1][2] = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
+  filter_rays_rotation_[1][0] = cos_pitch * sin_yaw;
+  filter_rays_rotation_[1][1] = sin_roll * sin_pitch * sin_yaw + cos_roll * cos_yaw;
+  filter_rays_rotation_[1][2] = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
 
-  filter_rotation_[2][0] = -sin_pitch;
-  filter_rotation_[2][1] = sin_roll * cos_pitch;
-  filter_rotation_[2][2] = cos_roll * cos_pitch;
+  filter_rays_rotation_[2][0] = -sin_pitch;
+  filter_rays_rotation_[2][1] = sin_roll * cos_pitch;
+  filter_rays_rotation_[2][2] = cos_roll * cos_pitch;
 
-  filter_yaw_start_ = param.rays_param.filter_rays_yaw_start * PI / 180.0;
-  filter_yaw_end_ = param.rays_param.filter_rays_yaw_end * PI / 180.0;
+  filter_rays_yaw_start_ = param.rays_param.filter_rays_yaw_start * PI / 180.0;
+  filter_rays_yaw_end_ = param.rays_param.filter_rays_yaw_end * PI / 180.0;
+  filter_rays_pitch_start_ = param.rays_param.filter_rays_pitch_start * PI / 180.0;
+  filter_rays_pitch_end_ = param.rays_param.filter_rays_pitch_end * PI / 180.0;
   is_set_filter_rays_params_ = true;
 }
 
@@ -553,14 +551,14 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
                 src_z * extrinsic_.rotation[2][2] + (extrinsic_.trans[2] / 1000.0);
     }
 
-    if (radius == 0.0) // Ray with no return
+    if (radius == 0.0f) // Ray with no return
     {
       PointXyzltrtp ray_no_return;
       ray_no_return.x = sin(theta) * cos(phi);
       ray_no_return.y = sin(theta) * sin(phi);
       ray_no_return.z = cos(theta);
-      ray_no_return.theta = theta;
-      ray_no_return.phi = phi;
+      //ray_no_return.theta = theta;
+      //ray_no_return.phi = phi;
       if (FilterRay(ray_no_return))
       {
         continue;
@@ -636,21 +634,20 @@ bool LidarPubHandler::FilterRay(const PointXyzltrtp& point)
   {
     return false;
   }
+
   // rotation to base frame
-#if 0
   PointXyzltrtp base_point = {};
-  base_point.x = point.x * filter_rotation_[0][0] +
-                  point.y * filter_rotation_[0][1] +
-                  point.z * filter_rotation_[0][2];
-  base_point.y = point.x * filter_rotation_[1][0] +
-                  point.y * filter_rotation_[1][1] +
-                  point.z * filter_rotation_[1][2];
-  base_point.z = point.x * filter_rotation_[2][0] +
-                  point.y * filter_rotation_[2][1] +
-                  point.z * filter_rotation_[2][2];
-#endif
-  double yaw = point.theta;
-  /*
+  base_point.x = point.x * filter_rays_rotation_[0][0] +
+                  point.y * filter_rays_rotation_[0][1] +
+                  point.z * filter_rays_rotation_[0][2];
+  base_point.y = point.x * filter_rays_rotation_[1][0] +
+                  point.y * filter_rays_rotation_[1][1] +
+                  point.z * filter_rays_rotation_[1][2];
+  base_point.z = point.x * filter_rays_rotation_[2][0] +
+                  point.y * filter_rays_rotation_[2][1] +
+                  point.z * filter_rays_rotation_[2][2];
+
+  double yaw;
   if (base_point.y >= 0.0)
   {
     yaw = std::acos(base_point.x / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y));
@@ -658,7 +655,7 @@ bool LidarPubHandler::FilterRay(const PointXyzltrtp& point)
   else
   {
     yaw = 2.0 * M_PI - std::acos(base_point.x / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y));
-  }*/
+  }
 
   if (filter_rays_yaw_end_ >= filter_rays_yaw_start_)
   {
@@ -667,15 +664,12 @@ bool LidarPubHandler::FilterRay(const PointXyzltrtp& point)
       return true;
     }
   }
-  else
+  else if (yaw < filter_rays_yaw_end_ || yaw > filter_rays_yaw_start_)
   {
-    if (yaw < filter_rays_yaw_end_ || yaw > filter_rays_yaw_start_)
-    {
-      return true;
-    }
+    return true;
   }
 
-  double pitch = point.phi; // std::asin(base_point.z / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y + base_point.z * base_point.z));
+  double pitch = std::asin(base_point.z / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y + base_point.z * base_point.z));
   if (pitch >= filter_rays_pitch_start_ && pitch <= filter_rays_pitch_end_)
   {
     return true;

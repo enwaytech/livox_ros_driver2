@@ -80,14 +80,21 @@ class LidarPubHandler {
 
   float filter_yaw_start_;
   float filter_yaw_end_;
-  std::mutex mutex_;
-  std::atomic_bool is_set_extrinsic_params_;
-  std::atomic_bool is_set_filter_params_;
+
+  RotationMatrix filter_rays_rotation_ = {
+      {1, 0, 0},
+      {0, 1, 0},
+      {0, 0, 1}
+  };
 
   float filter_rays_yaw_start_;
   float filter_rays_yaw_end_;
   float filter_rays_pitch_start_;
   float filter_rays_pitch_end_;
+
+  std::mutex mutex_;
+  std::atomic_bool is_set_extrinsic_params_;
+  std::atomic_bool is_set_filter_params_;
   std::atomic_bool is_set_filter_rays_params_;
 };
   

@@ -500,6 +500,7 @@ void Lddc::InitPointcloud2InvalidPointsMsg(const StoragePacket& pkg, PointCloud2
       point.thetha = pkg.points[i].theta;
       point.phi = pkg.points[i].phi;
       point.tag = pkg.points[i].tag;
+      point.intensity = pkg.points[i].intensity;
       points.push_back(std::move(point));
     }
   }
@@ -514,7 +515,7 @@ void Lddc::InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::
   cloud.header.frame_id.assign(frame_id);
   cloud.height = 1;
   cloud.width = 0;
-  cloud.fields.resize(7);
+  cloud.fields.resize(8);
   cloud.fields[0].offset = 0;
   cloud.fields[0].name = "x";
   cloud.fields[0].count = 1;
@@ -543,6 +544,10 @@ void Lddc::InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::
   cloud.fields[6].name = "tag";
   cloud.fields[6].count = 1;
   cloud.fields[6].datatype = PointField::UINT8;
+  cloud.fields[7].offset = 25;
+  cloud.fields[7].name = "intensity";
+  cloud.fields[7].count = 1;
+  cloud.fields[7].datatype = PointField::FLOAT32;
   cloud.point_step = sizeof(LivoxPointRtp);
 }
 
