@@ -79,7 +79,7 @@ class Lddc final {
 #ifdef BUILDING_ROS1
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
        const std::vector<double>& angular_velocity_covariance,
-       const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter, bool pub_invalid_points);
+       const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter, bool pub_non_return_rays);
 #elif defined BUILDING_ROS2
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
       std::string &frame_id);
@@ -116,9 +116,9 @@ class Lddc final {
   void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
   void PublishPointcloud2Data(const uint8_t index, uint64_t timestamp, const PointCloud2& cloud);
 
-  void InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::string& frame_id);
-  void InitPointcloud2InvalidPointsMsg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
-  void PublishPointcloud2InvalidPointsData(const uint8_t index, uint64_t timestamp, const PointCloud2& cloud);
+  void InitPointcloud2NonReturnRaysMsgHeader(PointCloud2& cloud, const std::string& frame_id);
+  void InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
+  void PublishPointcloud2NonReturnRaysData(const uint8_t index, uint64_t timestamp, const PointCloud2& cloud);
 
   void InitCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg, uint8_t index, const std::string& frame_id);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg);
@@ -140,7 +140,7 @@ class Lddc final {
 
   PublisherPtr GetCurrentPublisher(uint8_t index);
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
-  PublisherPtr GetCurrentInvalidPointsPublisher(uint8_t index);
+  PublisherPtr GetCurrentNonReturnRaysPublisher(uint8_t index);
 
  private:
   uint8_t transfer_format_;
@@ -156,14 +156,14 @@ class Lddc final {
 #ifdef BUILDING_ROS1
   bool enable_lidar_bag_;
   bool enable_imu_bag_;
-  bool pub_invalid_points_;
+  bool pub_non_return_rays_;
   std::optional<std::vector<dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtlt>>> dust_filters_;
   PublisherPtr private_pub_[kMaxSourceLidar];
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
-  PublisherPtr private_invalid_points_pub_[kMaxSourceLidar];
-  PublisherPtr global_invalid_points_pub_;
+  PublisherPtr private_non_return_rays_pub_[kMaxSourceLidar];
+  PublisherPtr global_non_return_rays_pub_;
   rosbag::Bag *bag_;
 
 #elif defined BUILDING_ROS2

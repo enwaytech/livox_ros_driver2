@@ -48,7 +48,7 @@ namespace livox_ros
 #ifdef BUILDING_ROS1
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
            const std::vector<double>& angular_velocity_covariance,
-           const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter, bool pub_invalid_points)
+           const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter, bool pub_non_return_rays)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
@@ -59,15 +59,15 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
       linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
       enable_imu_bag_(imu_bag),
-      pub_invalid_points_(pub_invalid_points) {
+      pub_non_return_rays_(pub_non_return_rays) {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
   memset(private_imu_pub_, 0, sizeof(private_imu_pub_));
-  memset(private_invalid_points_pub_, 0, sizeof(private_invalid_points_pub_));
+  memset(private_non_return_rays_pub_, 0, sizeof(private_non_return_rays_pub_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
-  global_invalid_points_pub_ = nullptr;
+  global_non_return_rays_pub_ = nullptr;
   cur_node_ = nullptr;
   bag_ = nullptr;
 
@@ -296,15 +296,12 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
     }
     PublishPointcloud2Data(index, timestamp, cloud);
 
-    if (pub_invalid_points_ || true)
+    if (pub_non_return_rays_)
     {
-      sensor_msgs::PointCloud2 invalid_points_cloud;
-      //printf("Publish invalid points.\n");
-      //printf("Points in pkg: %u", pkg.points.size());
-      InitPointcloud2InvalidPointsMsg(pkg, invalid_points_cloud, timestamp, frame_id);
-      PublishPointcloud2InvalidPointsData(index, timestamp, invalid_points_cloud);  
+      sensor_msgs::PointCloud2 non_return_rays_cloud;
+      InitPointcloud2NonReturnRaysMsg(pkg, non_return_rays_cloud, timestamp, frame_id);
+      PublishPointcloud2NonReturnRaysData(index, timestamp, non_return_rays_cloud);
     }
-
   }
 }
 
@@ -465,8 +462,8 @@ void Lddc::InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint
   memcpy(cloud.data.data(), points.data(), pkg.points_num * sizeof(LivoxPointXyzrtlt));
 }
 
-void Lddc::InitPointcloud2InvalidPointsMsg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id) {
-  InitPointcloud2InvalidPointsMsgHeader(cloud, frame_id);
+void Lddc::InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id) {
+  InitPointcloud2NonReturnRaysMsgHeader(cloud, frame_id);
 
   cloud.point_step = sizeof(LivoxPointRtp);
 
@@ -492,9 +489,9 @@ void Lddc::InitPointcloud2InvalidPointsMsg(const StoragePacket& pkg, PointCloud2
       double src_x = sin(pkg.points[i].theta) * cos(pkg.points[i].phi);
       double src_y = sin(pkg.points[i].theta) * sin(pkg.points[i].phi);
       double src_z = cos(pkg.points[i].theta);
-      point.x = src_x; //pkg.points[i].x;
-      point.y = src_y; //pkg.points[i].y;
-      point.z = src_z; //pkg.points[i].z;
+      point.x = src_x;
+      point.y = src_y;
+      point.z = src_z;
       point.range = pkg.points[i].range;
       point.thetha = pkg.points[i].theta;
       point.phi = pkg.points[i].phi;
@@ -503,14 +500,13 @@ void Lddc::InitPointcloud2InvalidPointsMsg(const StoragePacket& pkg, PointCloud2
       points.push_back(std::move(point));
     }
   }
-  //printf("Points %u\n", points.size());
   cloud.width = points.size();
   cloud.row_step = cloud.width * cloud.point_step;
   cloud.data.resize(points.size() * sizeof(LivoxPointRtp));
   memcpy(cloud.data.data(), points.data(), points.size() * sizeof(LivoxPointRtp));
 }
 
-void Lddc::InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::string& frame_id) {
+void Lddc::InitPointcloud2NonReturnRaysMsgHeader(PointCloud2& cloud, const std::string& frame_id) {
   cloud.header.frame_id.assign(frame_id);
   cloud.height = 1;
   cloud.width = 0;
@@ -550,12 +546,12 @@ void Lddc::InitPointcloud2InvalidPointsMsgHeader(PointCloud2& cloud, const std::
   cloud.point_step = sizeof(LivoxPointRtp);
 }
 
-void Lddc::PublishPointcloud2InvalidPointsData(const uint8_t index, const uint64_t timestamp, const PointCloud2& cloud) {
+void Lddc::PublishPointcloud2NonReturnRaysData(const uint8_t index, const uint64_t timestamp, const PointCloud2& cloud) {
 #ifdef BUILDING_ROS1
-  PublisherPtr publisher_ptr = Lddc::GetCurrentInvalidPointsPublisher(index);
+  PublisherPtr publisher_ptr = Lddc::GetCurrentNonReturnRaysPublisher(index);
 #elif defined BUILDING_ROS2
   Publisher<PointCloud2>::SharedPtr publisher_ptr =
-    std::dynamic_pointer_cast<Publisher<PointCloud2>>(GetCurrentInvalidPointsPublisher(index));
+    std::dynamic_pointer_cast<Publisher<PointCloud2>>(GetCurrentNonReturnRaysPublisher(index));
 #endif
 
   if (kOutputToRos == output_type_) {
@@ -894,15 +890,15 @@ PublisherPtr Lddc::GetCurrentImuPublisher(uint8_t handle) {
   return *pub;
 }
 
-PublisherPtr Lddc::GetCurrentInvalidPointsPublisher(uint8_t handle) {
+PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
   ros::Publisher **pub = nullptr;
   uint32_t queue_size = kMinEthPacketQueueSize;
 
   if (use_multi_topic_) {
-    pub = &private_invalid_points_pub_[handle];
+    pub = &private_non_return_rays_pub_[handle];
     queue_size = queue_size * 2; // queue size is 64 for only one lidar
   } else {
-    pub = &global_invalid_points_pub_;
+    pub = &global_non_return_rays_pub_;
     queue_size = queue_size * 8; // shared queue size is 256, for all lidars
   }
 
@@ -912,11 +908,11 @@ PublisherPtr Lddc::GetCurrentInvalidPointsPublisher(uint8_t handle) {
     if (use_multi_topic_) {
       DRIVER_INFO(*cur_node_, "Support multi topics.");
       std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
-      snprintf(name_str, sizeof(name_str), "livox/invalid_points_%s",
+      snprintf(name_str, sizeof(name_str), "livox/non_return_rays_%s",
                ReplacePeriodByUnderline(ip_string).c_str());
     } else {
       DRIVER_INFO(*cur_node_, "Support only one topic.");
-      snprintf(name_str, sizeof(name_str), "livox/invalid_points");
+      snprintf(name_str, sizeof(name_str), "livox/non_return_rays");
     }
 
     *pub = new ros::Publisher;
