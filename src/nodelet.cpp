@@ -56,6 +56,7 @@ livox_ros::Nodelet::onInit()
   bool lidar_bag = true;
   bool imu_bag   = false;
   bool dust_filter = false;
+  bool publish_non_return_rays = false;
   nh.getParam("xfer_format", xfer_format);
   nh.getParam("multi_topic", multi_topic);
   nh.getParam("data_src", data_src);
@@ -65,7 +66,7 @@ livox_ros::Nodelet::onInit()
   nh.getParam("enable_lidar_bag", lidar_bag);
   nh.getParam("enable_imu_bag", imu_bag);
   nh.getParam("enable_dust_filter", dust_filter);
-
+  nh.getParam("publish_non_return_rays", publish_non_return_rays);
   if (publish_freq > 100.0) {
     publish_freq = 100.0;
   } else if (publish_freq < 0.5) {
@@ -78,7 +79,7 @@ livox_ros::Nodelet::onInit()
 
   /** Lidar data distribute control and lidar data source set */
   livox_node_->lddc_ptr_ = std::make_unique<Lddc>(xfer_format, multi_topic, data_src, output_type,
-                        publish_freq, frame_id, lidar_bag, imu_bag, dust_filter);
+                        publish_freq, frame_id, lidar_bag, imu_bag, dust_filter, publish_non_return_rays);
   livox_node_->lddc_ptr_->SetRosNode(livox_node_.get());
 
   if (data_src == kSourceRawLidar) {
