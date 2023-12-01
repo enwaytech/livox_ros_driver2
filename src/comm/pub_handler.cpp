@@ -670,7 +670,14 @@ bool LidarPubHandler::FilterRay(const PointXyzltrtp& point)
   }
 
   double pitch = std::asin(base_point.z / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y + base_point.z * base_point.z));
-  if (pitch >= filter_rays_pitch_start_ && pitch <= filter_rays_pitch_end_)
+  if (filter_rays_pitch_end_ >= filter_rays_pitch_start_)
+  {
+    if (pitch >= filter_rays_pitch_start_ && pitch <= filter_rays_pitch_end_)
+    {
+      return true;
+    }
+  }
+  else if (pitch < filter_rays_pitch_end_ || pitch > filter_rays_pitch_start_)
   {
     return true;
   }
