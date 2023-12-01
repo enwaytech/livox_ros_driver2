@@ -214,7 +214,6 @@ bool LdsLidar::InitLivoxLidar() {
       rays_param.handle = config.handle;
       rays_param.lidar_type = kLivoxLidarType;
       rays_param.rays_param = config.filter_rays_param;
-      // Do I need these next lines? should be already copied from the line before?
       rays_param.rays_param.filter_rays_yaw_start = config.filter_rays_param.filter_rays_yaw_start;
       rays_param.rays_param.filter_rays_yaw_end = config.filter_rays_param.filter_rays_yaw_end;
       rays_param.rays_param.filter_rays_pitch_start = config.filter_rays_param.filter_rays_pitch_start;
