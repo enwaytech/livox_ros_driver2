@@ -452,6 +452,14 @@ void LidarPubHandler::SetLidarsFilterRaysParam(LidarFilterRaysParameter param) {
   filter_rays_yaw_end_ = param.rays_param.filter_rays_yaw_end * PI / 180.0;
   filter_rays_pitch_start_ = param.rays_param.filter_rays_pitch_start * PI / 180.0;
   filter_rays_pitch_end_ = param.rays_param.filter_rays_pitch_end * PI / 180.0;
+  if (param.rays_param.filter_rays_local_theta)
+  {
+    filter_rays_local_theta_ = true;
+    filter_rays_local_theta_start_ = param.rays_param.filter_rays_local_theta_start * PI / 180.0;
+    filter_rays_local_theta_end_ = param.rays_param.filter_rays_local_theta_end * PI / 180.0;
+  }
+
+
   is_set_filter_rays_params_ = true;
 }
 
@@ -557,8 +565,12 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
       ray_no_return.x = sin(theta) * cos(phi);
       ray_no_return.y = sin(theta) * sin(phi);
       ray_no_return.z = cos(theta);
-      //ray_no_return.theta = theta;
-      //ray_no_return.phi = phi;
+
+      if (is_set_filter_rays_params_ && filter_rays_local_theta_ && theta > filter_rays_local_theta_start_ && theta < filter_rays_local_theta_end_)
+      {
+        continue;
+      }
+
       if (FilterRay(ray_no_return))
       {
         continue;

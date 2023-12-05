@@ -63,6 +63,7 @@ class LidarPubHandler {
   void ProcessSphericalPoint(RawPacket & pkt);
   bool FilterYawPoint(const PointXyzltrtp& point);
   bool FilterRay(const PointXyzltrtp& point);
+
   std::vector<PointXyzltrtp> points_clouds_;
   ExtParameterDetailed extrinsic_ = {
     {0, 0, 0},
@@ -91,7 +92,9 @@ class LidarPubHandler {
   float filter_rays_yaw_end_;
   float filter_rays_pitch_start_;
   float filter_rays_pitch_end_;
-
+  bool filter_rays_local_theta_;
+  float filter_rays_local_theta_start_;
+  float filter_rays_local_theta_end_;
   std::mutex mutex_;
   std::atomic_bool is_set_extrinsic_params_;
   std::atomic_bool is_set_filter_params_;

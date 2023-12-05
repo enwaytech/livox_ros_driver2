@@ -253,6 +253,9 @@ typedef struct {
   float filter_rays_yaw_end; /**< End yaw angle, unit: degree. */
   float filter_rays_pitch_start; /**< Start pitch angle, unit: degree. */
   float filter_rays_pitch_end;  /**< End pitch angle, unit: degree. */
+  bool filter_rays_local_theta; /**< Use local theta filter or not. */
+  float filter_rays_local_theta_start; /**< Start local theta angle, unit: degree. */
+  float filter_rays_local_theta_end; /**< End local theta angle, unit: degree. */
 } FilterRaysParameter;
 
 typedef struct {

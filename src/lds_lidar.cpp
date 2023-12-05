@@ -274,7 +274,7 @@ std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const
   constexpr double transform_timeout {1.0};
   if(!buffer_.canTransform(target_frame, source_frame, ros::Time(0), ros::Duration(transform_timeout)))
   {
-    std::cout << "Timout wait for Transformation" << std::endl;
+    std::cout << "Timout wait for Transformation:" << target_frame << " " << source_frame << std::endl;
     return std::nullopt;
   }
 

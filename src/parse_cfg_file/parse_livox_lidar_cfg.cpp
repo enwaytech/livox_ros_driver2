@@ -246,6 +246,21 @@ bool LivoxLidarConfigParser::ParseFilterRaysParameters(const rapidjson::Value &v
   } else {
     param.filter_rays_pitch_end = static_cast<float>(value["filter_rays_pitch_end"].GetFloat());
   }
+  if (!value.HasMember("filter_rays_local_theta")) {
+    param.filter_rays_local_theta = false;
+  } else {
+    param.filter_rays_local_theta = true;
+    if (!value.HasMember("filter_rays_local_theta_start")) {
+      param.filter_rays_local_theta_start = 0.0f;
+    } else {
+      param.filter_rays_local_theta_start = static_cast<float>(value["filter_rays_local_theta_start"].GetFloat());
+    }
+    if (!value.HasMember("filter_rays_local_theta_end")) {
+      param.filter_rays_local_theta_end = 0.0f;
+    } else {
+      param.filter_rays_local_theta_end = static_cast<float>(value["filter_rays_local_theta_end"].GetFloat());
+    }
+  }
   return true;
 }
 } // namespace livox_ros
