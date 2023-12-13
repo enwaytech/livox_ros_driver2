@@ -486,19 +486,19 @@ void Lddc::InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, PointCloud2
   for (i = 0; i < pkg.points_num; ++i) {
     if (pkg.points[i].range == 0.0)
     {
-      LivoxPointRtp point; // x y z now only for debugging set to 1m for debugging
+      LivoxPointRtp ray;
       double src_x = sin(pkg.points[i].theta) * cos(pkg.points[i].phi);
       double src_y = sin(pkg.points[i].theta) * sin(pkg.points[i].phi);
       double src_z = cos(pkg.points[i].theta);
-      point.x = src_x;
-      point.y = src_y;
-      point.z = src_z;
-      point.range = pkg.points[i].range;
-      point.thetha = pkg.points[i].theta;
-      point.phi = pkg.points[i].phi;
-      point.tag = pkg.points[i].tag;
-      point.intensity = pkg.points[i].intensity;
-      points.push_back(std::move(point));
+      ray.x = src_x;
+      ray.y = src_y;
+      ray.z = src_z;
+      ray.range = pkg.points[i].range;
+      ray.thetha = pkg.points[i].theta;
+      ray.phi = pkg.points[i].phi;
+      ray.tag = pkg.points[i].tag;
+      ray.intensity = pkg.points[i].intensity;
+      ray.push_back(std::move(point));
     }
   }
   cloud.width = points.size();
@@ -626,7 +626,6 @@ void Lddc::FillPointsToCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg)
     point.reflectivity = points[i].intensity;
     point.tag = points[i].tag;
     point.line = points[i].line;
-    //point.range = sqrt(points[i].x * points[i].x + points[i].y * points[i].y + points[i].z * points[i].z);
     point.offset_time = static_cast<uint32_t>(points[i].offset_time - pkg.base_time);
 
     livox_msg.points.push_back(std::move(point));
