@@ -162,7 +162,6 @@ class PubHandler {
 
   std::map<uint32_t, std::unique_ptr<LidarPubHandler>> lidar_process_handlers_;
   std::map<uint32_t, std::vector<PointXyzltrtp>> points_;
-  std::map<uint32_t, std::vector<PointRtp>> non_return_rays_;
   std::map<uint32_t, LidarExtParameter> lidar_extrinsics_;
   std::map<uint32_t, LidarFilterParameter> lidar_filters_;
   std::map<uint32_t, LidarFilterRaysParameter> lidar_rays_filters_;

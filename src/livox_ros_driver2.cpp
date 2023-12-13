@@ -64,6 +64,7 @@ int main(int argc, char **argv) {
   bool publish_non_return_rays = false;
   std::vector<double> angular_velocity_covariance;
   std::vector<double> linear_acceleration_covariance;
+
   nh.getParam("xfer_format", xfer_format);
   nh.getParam("multi_topic", multi_topic);
   nh.getParam("data_src", data_src);
