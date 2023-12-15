@@ -458,8 +458,10 @@ void LidarPubHandler::SetLidarsFilterRaysParam(LidarFilterRaysParameter param) {
     filter_rays_local_theta_start_ = param.rays_param.filter_rays_local_theta_start * PI / 180.0;
     filter_rays_local_theta_end_ = param.rays_param.filter_rays_local_theta_end * PI / 180.0;
   }
-
-
+  else
+  {
+    filter_rays_local_theta_ = false;
+  }
   is_set_filter_rays_params_ = true;
 }
 
@@ -559,7 +561,7 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
                 src_z * extrinsic_.rotation[2][2] + (extrinsic_.trans[2] / 1000.0);
     }
 
-    if (radius == 0.0f) // Ray with no return
+    if (raw[i].depth == 0U) // Ray with no return
     {
       PointXyzltrtp ray_no_return;
       ray_no_return.x = sin(theta) * cos(phi);
