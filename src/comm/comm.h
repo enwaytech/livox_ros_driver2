@@ -162,12 +162,6 @@ typedef struct {
 } PointXyzltrtp;
 
 typedef struct {
-  float range;
-  float theta;
-  float phi;
-} PointRtp;
-
-typedef struct {
   uint32_t handle;
   uint8_t lidar_type; ////refer to LivoxLidarType
   uint32_t points_num;
