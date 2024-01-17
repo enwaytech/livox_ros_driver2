@@ -130,6 +130,22 @@ bool LivoxLidarConfigParser::ParseUserConfigs(const rapidjson::Document &doc,
         return false;
       }
     }
+
+    if (!config.HasMember("enable_rays_filter")) {
+      user_config.enable_rays_filter = false;
+    } else {
+      user_config.enable_rays_filter = static_cast<bool>(config["enable_rays_filter"].GetBool());
+    }
+    if (!config.HasMember("filter_rays_parameter") || !user_config.enable_rays_filter) {
+      user_config.filter_rays_param = FilterRaysParameter{};
+    } else {
+      auto &value = config["filter_rays_parameter"];
+      if (!ParseFilterRaysParameters(value, user_config.filter_rays_param)) {
+        user_config.filter_rays_param = FilterRaysParameter{};
+        std::cout << "failed to parse filter rays parameters, ip: "
+                  << IpNumToString(user_config.handle) << std::endl;
+      }
+    }
     user_config.set_bits = 0;
     user_config.get_bits = 0;
 
@@ -198,6 +214,52 @@ bool LivoxLidarConfigParser::ParseFilterParameters(const rapidjson::Value &value
     param.filter_yaw_end = 360.0f;
   } else {
     param.filter_yaw_end = static_cast<float>(value["filter_yaw_end"].GetFloat());
+  }
+  return true;
+}
+
+bool LivoxLidarConfigParser::ParseFilterRaysParameters(const rapidjson::Value &value,
+                                                       FilterRaysParameter &param) {
+
+  if (!value.HasMember("filter_rays_frame_id")) {
+    param.filter_rays_frame_id = "";
+  } else {
+    param.filter_rays_frame_id = static_cast<std::string>(value["filter_rays_frame_id"].GetString());
+  }
+  if (!value.HasMember("filter_rays_yaw_start")) {
+    param.filter_rays_yaw_start = 0.0f;
+  } else {
+    param.filter_rays_yaw_start = static_cast<float>(value["filter_rays_yaw_start"].GetFloat());
+  }
+  if (!value.HasMember("filter_rays_yaw_end")) {
+    param.filter_rays_yaw_end = 360.0f;
+  } else {
+    param.filter_rays_yaw_end = static_cast<float>(value["filter_rays_yaw_end"].GetFloat());
+  }
+  if (!value.HasMember("filter_rays_pitch_start")) {
+    param.filter_rays_pitch_start = 0.0f;
+  } else {
+    param.filter_rays_pitch_start = static_cast<float>(value["filter_rays_pitch_start"].GetFloat());
+  }
+  if (!value.HasMember("filter_rays_pitch_end")) {
+    param.filter_rays_pitch_end = 360.0f;
+  } else {
+    param.filter_rays_pitch_end = static_cast<float>(value["filter_rays_pitch_end"].GetFloat());
+  }
+  if (!value.HasMember("filter_rays_local_theta")) {
+    param.filter_rays_local_theta = false;
+  } else {
+    param.filter_rays_local_theta = value["filter_rays_local_theta"].GetBool();
+    if (!value.HasMember("filter_rays_local_theta_start")) {
+      param.filter_rays_local_theta_start = 0.0f;
+    } else {
+      param.filter_rays_local_theta_start = static_cast<float>(value["filter_rays_local_theta_start"].GetFloat());
+    }
+    if (!value.HasMember("filter_rays_local_theta_end")) {
+      param.filter_rays_local_theta_end = 0.0f;
+    } else {
+      param.filter_rays_local_theta_end = static_cast<float>(value["filter_rays_local_theta_end"].GetFloat());
+    }
   }
   return true;
 }

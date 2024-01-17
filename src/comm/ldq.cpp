@@ -100,7 +100,7 @@ bool QueuePrePop(LidarDataQueue *queue, StoragePacket *storage_packet) {
   storage_packet->points_num = queue->storage_packet[rd_idx].points_num;
   storage_packet->points.resize(queue->storage_packet[rd_idx].points_num);
 
-  memcpy(storage_packet->points.data(), queue->storage_packet[rd_idx].points.data(), (storage_packet->points_num) * sizeof(PointXyzlt));
+  memcpy(storage_packet->points.data(), queue->storage_packet[rd_idx].points.data(), (storage_packet->points_num) * sizeof(PointXyzltrtp));
   return true;
 }
 
@@ -141,7 +141,7 @@ uint32_t QueuePushAny(LidarDataQueue *queue, uint8_t *data, const uint64_t base_
 
   queue->storage_packet[wr_idx].points.clear();
   queue->storage_packet[wr_idx].points.resize(lidar_point_data->points_num);
-  memcpy(queue->storage_packet[wr_idx].points.data(), lidar_point_data->points, sizeof(PointXyzlt) * (lidar_point_data->points_num));
+  memcpy(queue->storage_packet[wr_idx].points.data(), lidar_point_data->points, sizeof(PointXyzltrtp) * (lidar_point_data->points_num));
 
   queue->wr_idx++;
   return 1;

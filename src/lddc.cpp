@@ -48,7 +48,7 @@ namespace livox_ros
 #ifdef BUILDING_ROS1
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
            const std::vector<double>& angular_velocity_covariance,
-           const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter)
+           const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter, bool pub_non_return_rays)
     : transfer_format_(format),
       use_multi_topic_(multi_topic),
       data_src_(data_src),
@@ -58,13 +58,16 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
       angular_velocity_covariance_(angular_velocity_covariance),
       linear_acceleration_covariance_(linear_acceleration_covariance),
       enable_lidar_bag_(lidar_bag),
-      enable_imu_bag_(imu_bag) {
+      enable_imu_bag_(imu_bag),
+      pub_non_return_rays_(pub_non_return_rays) {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
   memset(private_imu_pub_, 0, sizeof(private_imu_pub_));
+  memset(private_non_return_rays_pub_, 0, sizeof(private_non_return_rays_pub_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
+  global_non_return_rays_pub_ = nullptr;
   cur_node_ = nullptr;
   bag_ = nullptr;
 
@@ -292,6 +295,13 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       InitPointcloud2Msg(pkg, cloud, timestamp, frame_id);
     }
     PublishPointcloud2Data(index, timestamp, cloud);
+
+    if (pub_non_return_rays_)
+    {
+      sensor_msgs::PointCloud2 non_return_rays_cloud;
+      InitPointcloud2NonReturnRaysMsg(pkg, non_return_rays_cloud, timestamp, frame_id);
+      PublishPointcloud2NonReturnRaysData(index, timestamp, non_return_rays_cloud);
+    }
   }
 }
 
@@ -452,6 +462,109 @@ void Lddc::InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint
   memcpy(cloud.data.data(), points.data(), pkg.points_num * sizeof(LivoxPointXyzrtlt));
 }
 
+void Lddc::InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id) {
+  InitPointcloud2NonReturnRaysMsgHeader(cloud, frame_id);
+
+  cloud.point_step = sizeof(LivoxPointRtp);
+
+  cloud.is_bigendian = false;
+  cloud.is_dense     = true;
+
+  if (!pkg.points.empty()) {
+    timestamp = pkg.base_time;
+  }
+
+  #ifdef BUILDING_ROS1
+      cloud.header.stamp = ros::Time( timestamp / 1000000000.0);
+  #elif defined BUILDING_ROS2
+      cloud.header.stamp = rclcpp::Time(timestamp);
+  #endif
+
+  std::vector<LivoxPointRtp> rays;
+  size_t i {0};
+  for (i = 0; i < pkg.points_num; ++i) {
+    if (pkg.points[i].range == 0.0)
+    {
+      LivoxPointRtp ray;
+      double src_x = sin(pkg.points[i].theta) * cos(pkg.points[i].phi);
+      double src_y = sin(pkg.points[i].theta) * sin(pkg.points[i].phi);
+      double src_z = cos(pkg.points[i].theta);
+      ray.x = src_x;
+      ray.y = src_y;
+      ray.z = src_z;
+      ray.range = pkg.points[i].range;
+      ray.thetha = pkg.points[i].theta;
+      ray.phi = pkg.points[i].phi;
+      ray.tag = pkg.points[i].tag;
+      ray.intensity = pkg.points[i].intensity;
+      rays.push_back(std::move(ray));
+    }
+  }
+  cloud.width = rays.size();
+  cloud.row_step = cloud.width * cloud.point_step;
+  cloud.data.resize(rays.size() * sizeof(LivoxPointRtp));
+  memcpy(cloud.data.data(), rays.data(), rays.size() * sizeof(LivoxPointRtp));
+}
+
+void Lddc::InitPointcloud2NonReturnRaysMsgHeader(PointCloud2& cloud, const std::string& frame_id) {
+  cloud.header.frame_id.assign(frame_id);
+  cloud.height = 1;
+  cloud.width = 0;
+  cloud.fields.resize(8);
+  cloud.fields[0].offset = 0;
+  cloud.fields[0].name = "x";
+  cloud.fields[0].count = 1;
+  cloud.fields[0].datatype = PointField::FLOAT32;
+  cloud.fields[1].offset = 4;
+  cloud.fields[1].name = "y";
+  cloud.fields[1].count = 1;
+  cloud.fields[1].datatype = PointField::FLOAT32;
+  cloud.fields[2].offset = 8;
+  cloud.fields[2].name = "z";
+  cloud.fields[2].count = 1;
+  cloud.fields[2].datatype = PointField::FLOAT32;
+  cloud.fields[3].offset = 12;
+  cloud.fields[3].name = "range";
+  cloud.fields[3].count = 1;
+  cloud.fields[3].datatype = PointField::FLOAT32;
+  cloud.fields[4].offset = 16;
+  cloud.fields[4].name = "thetha";
+  cloud.fields[4].count = 1;
+  cloud.fields[4].datatype = PointField::FLOAT32;
+  cloud.fields[5].offset = 20;
+  cloud.fields[5].name = "phi";
+  cloud.fields[5].count = 1;
+  cloud.fields[5].datatype = PointField::FLOAT32;
+  cloud.fields[6].offset = 24;
+  cloud.fields[6].name = "tag";
+  cloud.fields[6].count = 1;
+  cloud.fields[6].datatype = PointField::UINT8;
+  cloud.fields[7].offset = 25;
+  cloud.fields[7].name = "intensity";
+  cloud.fields[7].count = 1;
+  cloud.fields[7].datatype = PointField::FLOAT32;
+  cloud.point_step = sizeof(LivoxPointRtp);
+}
+
+void Lddc::PublishPointcloud2NonReturnRaysData(const uint8_t index, const uint64_t timestamp, const PointCloud2& cloud) {
+#ifdef BUILDING_ROS1
+  PublisherPtr publisher_ptr = Lddc::GetCurrentNonReturnRaysPublisher(index);
+#elif defined BUILDING_ROS2
+  Publisher<PointCloud2>::SharedPtr publisher_ptr =
+    std::dynamic_pointer_cast<Publisher<PointCloud2>>(GetCurrentNonReturnRaysPublisher(index));
+#endif
+
+  if (kOutputToRos == output_type_) {
+    publisher_ptr->publish(cloud);
+  } else {
+#ifdef BUILDING_ROS1
+    if (bag_ && enable_lidar_bag_) {
+      bag_->write(publisher_ptr->getTopic(), ros::Time(timestamp / 1000000000.0), cloud);
+    }
+#endif
+  }
+}
+
 void Lddc::PublishPointcloud2Data(const uint8_t index, const uint64_t timestamp, const PointCloud2& cloud) {
 #ifdef BUILDING_ROS1
   PublisherPtr publisher_ptr = Lddc::GetCurrentPublisher(index);
@@ -503,7 +616,7 @@ void Lddc::InitCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg, uint8_t
 
 void Lddc::FillPointsToCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg) {
   uint32_t points_num = pkg.points_num;
-  const std::vector<PointXyzlt>& points = pkg.points;
+  const std::vector<PointXyzltrtp>& points = pkg.points;
   for (uint32_t i = 0; i < points_num; ++i) {
     CustomPoint point;
     point.x = points[i].x;
@@ -561,7 +674,7 @@ void Lddc::FillPointsToPclMsg(const StoragePacket& pkg, PointCloud& pcl_msg) {
   }
 
   uint32_t points_num = pkg.points_num;
-  const std::vector<PointXyzlt>& points = pkg.points;
+  const std::vector<PointXyzltrtp>& points = pkg.points;
   for (uint32_t i = 0; i < points_num; ++i) {
     pcl::PointXYZI point;
     point.x = points[i].x;
@@ -775,6 +888,41 @@ PublisherPtr Lddc::GetCurrentImuPublisher(uint8_t handle) {
 
   return *pub;
 }
+
+PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
+  ros::Publisher **pub = nullptr;
+  uint32_t queue_size = kMinEthPacketQueueSize;
+
+  if (use_multi_topic_) {
+    pub = &private_non_return_rays_pub_[handle];
+    queue_size = queue_size * 2; // queue size is 64 for only one lidar
+  } else {
+    pub = &global_non_return_rays_pub_;
+    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+  }
+
+  if (*pub == nullptr) {
+    char name_str[48];
+    memset(name_str, 0, sizeof(name_str));
+    if (use_multi_topic_) {
+      DRIVER_INFO(*cur_node_, "Support multi topics.");
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/non_return_rays_%s",
+               ReplacePeriodByUnderline(ip_string).c_str());
+    } else {
+      DRIVER_INFO(*cur_node_, "Support only one topic.");
+      snprintf(name_str, sizeof(name_str), "livox/non_return_rays");
+    }
+
+    *pub = new ros::Publisher;
+    **pub = cur_node_->GetNode().advertise<sensor_msgs::PointCloud2>(name_str, queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish invalid point data, set ROS publisher queue size %d", name_str,
+             queue_size);
+  }
+
+  return *pub;
+}
+
 #elif defined BUILDING_ROS2
 std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentPublisher(uint8_t handle) {
   uint32_t queue_size = kMinEthPacketQueueSize;

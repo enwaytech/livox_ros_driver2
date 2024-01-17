@@ -38,7 +38,16 @@ typedef struct {
   uint8_t line;       /**< Laser line id     */
   double timestamp;   /**< Timestamp of point*/
 } LivoxPointXyzrtlt;
-
+typedef struct {
+  float x;
+  float y;
+  float z;
+  float range;        /**< Range Unit:m */
+  float thetha;       /**< Theta angle [rad]*/
+  float phi;          /**< Phi angle [rad]*/
+  uint8_t tag;
+  float intensity;
+} LivoxPointRtp;
 #pragma pack()
 
 }

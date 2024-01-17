@@ -156,13 +156,16 @@ typedef struct {
   uint8_t tag;
   uint8_t line;
   uint64_t offset_time;
-} PointXyzlt;
+  float range;
+  float theta;
+  float phi;
+} PointXyzltrtp;
 
 typedef struct {
   uint32_t handle;
   uint8_t lidar_type; ////refer to LivoxLidarType
   uint32_t points_num;
-  PointXyzlt* points;
+  PointXyzltrtp* points;
 } PointPacket;
 
 typedef struct {
@@ -178,7 +181,7 @@ typedef struct {
   uint32_t handle;
   uint64_t base_time;
   uint32_t points_num;
-  std::vector<PointXyzlt> points;
+  std::vector<PointXyzltrtp> points;
 } StoragePacket;
 
 typedef struct {
@@ -239,12 +242,29 @@ typedef struct {
 } FilterParameter;
 
 typedef struct {
+  std::string filter_rays_frame_id;  /**< Frame */
+  float filter_rays_yaw_start; /**< Start yaw angle, unit: degree. */
+  float filter_rays_yaw_end; /**< End yaw angle, unit: degree. */
+  float filter_rays_pitch_start; /**< Start pitch angle, unit: degree. */
+  float filter_rays_pitch_end;  /**< End pitch angle, unit: degree. */
+  bool filter_rays_local_theta; /**< Use local theta filter or not. */
+  float filter_rays_local_theta_start; /**< Start local theta angle, unit: degree. */
+  float filter_rays_local_theta_end; /**< End local theta angle, unit: degree. */
+} FilterRaysParameter;
+
+typedef struct {
   LidarProtoType lidar_type;
   uint32_t handle;
   FilterTransformParameter transform;
   FilterParameter param;
 } LidarFilterParameter;
 
+typedef struct {
+  LidarProtoType lidar_type;
+  uint32_t handle;
+  FilterTransformParameter transform;
+  FilterRaysParameter rays_param;
+} LidarFilterRaysParameter;
 
 /** Configuration in json config file for livox lidar */
 typedef struct {
@@ -278,7 +298,9 @@ typedef struct {
   std::string frame_id;
   ExtParameter extrinsic_param;
   bool enable_yaw_filter;
+  bool enable_rays_filter;
   FilterParameter filter_param;
+  FilterRaysParameter filter_rays_param;
   volatile uint32_t set_bits;
   volatile uint32_t get_bits;
 } UserLivoxLidarConfig;

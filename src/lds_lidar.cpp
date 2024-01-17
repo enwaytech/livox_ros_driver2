@@ -208,6 +208,30 @@ bool LdsLidar::InitLivoxLidar() {
         throw std::runtime_error("Failed to lookup transformation between " + config.frame_id + " and " + config.filter_param.filter_frame_id);
       }
     }
+
+    if (config.enable_rays_filter) {
+      LidarFilterRaysParameter rays_param;
+      rays_param.handle = config.handle;
+      rays_param.lidar_type = kLivoxLidarType;
+      rays_param.rays_param = config.filter_rays_param;
+      rays_param.rays_param.filter_rays_yaw_start = config.filter_rays_param.filter_rays_yaw_start;
+      rays_param.rays_param.filter_rays_yaw_end = config.filter_rays_param.filter_rays_yaw_end;
+      rays_param.rays_param.filter_rays_pitch_start = config.filter_rays_param.filter_rays_pitch_start;
+      rays_param.rays_param.filter_rays_pitch_end = config.filter_rays_param.filter_rays_pitch_end;
+      auto rotation = GetTransformation(config.filter_rays_param.filter_rays_frame_id, config.frame_id);
+      if (rotation)
+      {
+        rays_param.transform.roll = std::get<0>(*rotation);
+        rays_param.transform.pitch = std::get<1>(*rotation);
+        rays_param.transform.yaw = std::get<2>(*rotation);
+        pub_handler().AddLidarsFilterRaysParam(rays_param);
+      }
+      else
+      {
+        throw std::runtime_error("Failed to lookup transformation between " + config.frame_id + " and " + config.filter_rays_param.filter_rays_frame_id);
+      }
+    }
+
   }
 
   SetLivoxLidarInfoChangeCallback(LivoxLidarCallback::LidarInfoChangeCallback, g_lds_ldiar);
@@ -250,7 +274,7 @@ std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const
   constexpr double transform_timeout {1.0};
   if(!buffer_.canTransform(target_frame, source_frame, ros::Time(0), ros::Duration(transform_timeout)))
   {
-    std::cout << "Timout wait for Transformation" << std::endl;
+    std::cout << "Timout wait for Transformation:" << target_frame << " " << source_frame << std::endl;
     return std::nullopt;
   }
 

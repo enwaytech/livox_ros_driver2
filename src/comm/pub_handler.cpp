@@ -90,7 +90,6 @@ void PubHandler::ClearAllLidarsExtrinsicParams() {
 }
 
 void PubHandler::AddLidarsFilterParam(LidarFilterParameter& filter_param) {
-
   std::unique_lock<std::mutex> lock(packet_mutex_);
   uint32_t id = 0;
   GetLidarId(filter_param.lidar_type, filter_param.handle, id);
@@ -100,6 +99,18 @@ void PubHandler::AddLidarsFilterParam(LidarFilterParameter& filter_param) {
 void PubHandler::ClearAllLidarsFilterParams() {
   std::unique_lock<std::mutex> lock(packet_mutex_);
   lidar_filters_.clear();
+}
+
+void PubHandler::AddLidarsFilterRaysParam(LidarFilterRaysParameter& filter_rays_param) {
+  std::unique_lock<std::mutex> lock(packet_mutex_);
+  uint32_t id = 0;
+  GetLidarId(filter_rays_param.lidar_type, filter_rays_param.handle, id);
+  lidar_rays_filters_[id] = filter_rays_param;
+}
+
+void PubHandler::ClearAllLidarsFilterRaysParams() {
+  std::unique_lock<std::mutex> lock(packet_mutex_);
+  lidar_rays_filters_.clear();
 }
 
 void PubHandler::SetPointCloudsCallback(PointCloudsCallback cb, void* client_data) {
@@ -269,6 +280,9 @@ void PubHandler::RawDataProcess() {
     if (lidar_filters_.find(id) != lidar_filters_.end()) {
         lidar_process_handlers_[id]->SetLidarsFilterParam(lidar_filters_[id]);
     }
+    if (lidar_rays_filters_.find(id) != lidar_rays_filters_.end()) {
+        lidar_process_handlers_[id]->SetLidarsFilterRaysParam(lidar_rays_filters_[id]);
+    }
     process_handler->PointCloudProcess(raw_data);
     CheckTimer(id);
   }
@@ -296,7 +310,7 @@ uint64_t PubHandler::GetEthPacketTimestamp(uint8_t timestamp_type, uint8_t* time
 
 /*******************************/
 /*  LidarPubHandler Definitions*/
-LidarPubHandler::LidarPubHandler() : is_set_extrinsic_params_(false), is_set_filter_params_(false) {}
+LidarPubHandler::LidarPubHandler() : is_set_extrinsic_params_(false), is_set_filter_params_(false), is_set_filter_rays_params_(false) {}
 
 uint64_t LidarPubHandler::GetLidarBaseTime() {
   if (points_clouds_.empty()) {
@@ -305,7 +319,7 @@ uint64_t LidarPubHandler::GetLidarBaseTime() {
   return points_clouds_.at(0).offset_time;
 }
 
-void LidarPubHandler::GetLidarPointClouds(std::vector<PointXyzlt>& points_clouds) {
+void LidarPubHandler::GetLidarPointClouds(std::vector<PointXyzltrtp>& points_clouds) {
   std::lock_guard<std::mutex> lock(mutex_);
   points_clouds.swap(points_clouds_);
 }
@@ -411,9 +425,49 @@ void LidarPubHandler::SetLidarsFilterParam(LidarFilterParameter param) {
   is_set_filter_params_ = true;
 }
 
+void LidarPubHandler::SetLidarsFilterRaysParam(LidarFilterRaysParameter param) {
+  if (is_set_filter_rays_params_) {
+    return;
+  }
+  double cos_roll = cos(static_cast<double>(param.transform.roll));
+  double cos_pitch = cos(static_cast<double>(param.transform.pitch));
+  double cos_yaw = cos(static_cast<double>(param.transform.yaw));
+  double sin_roll = sin(static_cast<double>(param.transform.roll));
+  double sin_pitch = sin(static_cast<double>(param.transform.pitch));
+  double sin_yaw = sin(static_cast<double>(param.transform.yaw));
+
+  filter_rays_rotation_[0][0] = cos_pitch * cos_yaw;
+  filter_rays_rotation_[0][1] = sin_roll * sin_pitch * cos_yaw - cos_roll * sin_yaw;
+  filter_rays_rotation_[0][2] = cos_roll * sin_pitch * cos_yaw + sin_roll * sin_yaw;
+
+  filter_rays_rotation_[1][0] = cos_pitch * sin_yaw;
+  filter_rays_rotation_[1][1] = sin_roll * sin_pitch * sin_yaw + cos_roll * cos_yaw;
+  filter_rays_rotation_[1][2] = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
+
+  filter_rays_rotation_[2][0] = -sin_pitch;
+  filter_rays_rotation_[2][1] = sin_roll * cos_pitch;
+  filter_rays_rotation_[2][2] = cos_roll * cos_pitch;
+
+  filter_rays_yaw_start_ = param.rays_param.filter_rays_yaw_start * PI / 180.0;
+  filter_rays_yaw_end_ = param.rays_param.filter_rays_yaw_end * PI / 180.0;
+  filter_rays_pitch_start_ = param.rays_param.filter_rays_pitch_start * PI / 180.0;
+  filter_rays_pitch_end_ = param.rays_param.filter_rays_pitch_end * PI / 180.0;
+  if (param.rays_param.filter_rays_local_theta)
+  {
+    filter_rays_local_theta_ = true;
+    filter_rays_local_theta_start_ = param.rays_param.filter_rays_local_theta_start * PI / 180.0;
+    filter_rays_local_theta_end_ = param.rays_param.filter_rays_local_theta_end * PI / 180.0;
+  }
+  else
+  {
+    filter_rays_local_theta_ = false;
+  }
+  is_set_filter_rays_params_ = true;
+}
+
 void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
   LivoxLidarCartesianHighRawPoint* raw = (LivoxLidarCartesianHighRawPoint*)pkt.raw_data.data();
-  PointXyzlt point = {};
+  PointXyzltrtp point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
     if (pkt.extrinsic_enable) {
       point.x = raw[i].x / 1000.0;
@@ -430,8 +484,8 @@ void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
                 raw[i].y * extrinsic_.rotation[2][1] +
                 raw[i].z * extrinsic_.rotation[2][2] + extrinsic_.trans[2]) / 1000.0;
     }
-
-    if (FilterYawPoint(point))
+    point.range = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+    if (FilterYawPoint(point) && point.range != 0.0f)
     {
       continue;
     }
@@ -447,7 +501,7 @@ void LidarPubHandler::ProcessCartesianHighPoint(RawPacket & pkt) {
 
 void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {
   LivoxLidarCartesianLowRawPoint* raw = (LivoxLidarCartesianLowRawPoint*)pkt.raw_data.data();
-  PointXyzlt point = {};
+  PointXyzltrtp point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
     if (pkt.extrinsic_enable) {
       point.x = raw[i].x / 100.0;
@@ -465,7 +519,9 @@ void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {
                 raw[i].z * extrinsic_.rotation[2][2] + extrinsic_.trans[2]) / 100.0;
     }
 
-    if (FilterYawPoint(point))
+    point.range = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+
+    if (FilterYawPoint(point) && point.range != 0.0f)
     {
       continue;
     }
@@ -481,7 +537,7 @@ void LidarPubHandler::ProcessCartesianLowPoint(RawPacket & pkt) {
 
 void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
   LivoxLidarSpherPoint* raw = (LivoxLidarSpherPoint*)pkt.raw_data.data();
-  PointXyzlt point = {};
+  PointXyzltrtp point = {};
   for (uint32_t i = 0; i < pkt.point_num; i++) {
     double radius = raw[i].depth / 1000.0;
     double theta = raw[i].theta / 100.0 / 180 * PI;
@@ -505,7 +561,24 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
                 src_z * extrinsic_.rotation[2][2] + (extrinsic_.trans[2] / 1000.0);
     }
 
-    if (FilterYawPoint(point))
+    if (raw[i].depth == 0U) // Ray with no return
+    {
+      PointXyzltrtp ray_no_return;
+      ray_no_return.x = sin(theta) * cos(phi);
+      ray_no_return.y = sin(theta) * sin(phi);
+      ray_no_return.z = cos(theta);
+
+      if (is_set_filter_rays_params_ && filter_rays_local_theta_ && theta > filter_rays_local_theta_start_ && theta < filter_rays_local_theta_end_)
+      {
+        continue;
+      }
+
+      if (FilterRay(ray_no_return))
+      {
+        continue;
+      }
+    }
+    else if (FilterYawPoint(point))
     {
       continue;
     }
@@ -514,20 +587,23 @@ void LidarPubHandler::ProcessSphericalPoint(RawPacket& pkt) {
     point.line = i % pkt.line_num;
     point.tag = raw[i].tag;
     point.offset_time = pkt.time_stamp + i * pkt.point_interval;
+    point.range = radius;
+    point.theta = theta;
+    point.phi = phi;
 
     std::lock_guard<std::mutex> lock(mutex_);
     points_clouds_.push_back(point);
   }
 }
 
-bool LidarPubHandler::FilterYawPoint(const PointXyzlt& point)
+bool LidarPubHandler::FilterYawPoint(const PointXyzltrtp& point)
 {
   if (!is_set_filter_params_)
   {
     return false;
   }
   // rotation to base frame
-  PointXyzlt base_point = {};
+  PointXyzltrtp base_point = {};
   base_point.x = point.x * filter_rotation_[0][0] +
                   point.y * filter_rotation_[0][1] +
                   point.z * filter_rotation_[0][2];
@@ -564,6 +640,63 @@ bool LidarPubHandler::FilterYawPoint(const PointXyzlt& point)
     }
     return true;
   }
+}
+
+bool LidarPubHandler::FilterRay(const PointXyzltrtp& point)
+{
+  if (!is_set_filter_rays_params_)
+  {
+    return false;
+  }
+
+  // rotation to base frame
+  PointXyzltrtp base_point = {};
+  base_point.x = point.x * filter_rays_rotation_[0][0] +
+                  point.y * filter_rays_rotation_[0][1] +
+                  point.z * filter_rays_rotation_[0][2];
+  base_point.y = point.x * filter_rays_rotation_[1][0] +
+                  point.y * filter_rays_rotation_[1][1] +
+                  point.z * filter_rays_rotation_[1][2];
+  base_point.z = point.x * filter_rays_rotation_[2][0] +
+                  point.y * filter_rays_rotation_[2][1] +
+                  point.z * filter_rays_rotation_[2][2];
+
+  double yaw;
+  if (base_point.y >= 0.0)
+  {
+    yaw = std::acos(base_point.x / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y));
+  }
+  else
+  {
+    yaw = 2.0 * M_PI - std::acos(base_point.x / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y));
+  }
+
+  if (filter_rays_yaw_end_ >= filter_rays_yaw_start_)
+  {
+    if (yaw >= filter_rays_yaw_start_ && yaw <= filter_rays_yaw_end_)
+    {
+      return true;
+    }
+  }
+  else if (yaw < filter_rays_yaw_end_ || yaw > filter_rays_yaw_start_)
+  {
+    return true;
+  }
+
+  double pitch = std::asin(base_point.z / std::sqrt(base_point.x * base_point.x + base_point.y * base_point.y + base_point.z * base_point.z));
+  if (filter_rays_pitch_end_ >= filter_rays_pitch_start_)
+  {
+    if (pitch >= filter_rays_pitch_start_ && pitch <= filter_rays_pitch_end_)
+    {
+      return true;
+    }
+  }
+  else if (pitch < filter_rays_pitch_end_ || pitch > filter_rays_pitch_start_)
+  {
+    return true;
+  }
+
+  return false;
 }
 
 } // namespace livox_ros
