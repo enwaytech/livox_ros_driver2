@@ -228,7 +228,7 @@ bool LdsLidar::InitLivoxLidar() {
       }
       else
       {
-        throw std::runtime_error("Failed to lookup transformation between " + config.frame_id + " and " + config.filter_param.filter_frame_id);
+        throw std::runtime_error("Failed to lookup transformation between " + config.frame_id + " and " + config.filter_rays_param.filter_rays_frame_id);
       }
     }
 

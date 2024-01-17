@@ -249,7 +249,7 @@ bool LivoxLidarConfigParser::ParseFilterRaysParameters(const rapidjson::Value &v
   if (!value.HasMember("filter_rays_local_theta")) {
     param.filter_rays_local_theta = false;
   } else {
-    param.filter_rays_local_theta = true;
+    param.filter_rays_local_theta = value["filter_rays_local_theta"].GetBool();
     if (!value.HasMember("filter_rays_local_theta_start")) {
       param.filter_rays_local_theta_start = 0.0f;
     } else {

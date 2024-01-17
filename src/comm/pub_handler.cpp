@@ -98,7 +98,7 @@ void PubHandler::AddLidarsFilterParam(LidarFilterParameter& filter_param) {
 
 void PubHandler::ClearAllLidarsFilterParams() {
   std::unique_lock<std::mutex> lock(packet_mutex_);
-  lidar_rays_filters_.clear();
+  lidar_filters_.clear();
 }
 
 void PubHandler::AddLidarsFilterRaysParam(LidarFilterRaysParameter& filter_rays_param) {
