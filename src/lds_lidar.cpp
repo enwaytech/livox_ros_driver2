@@ -241,6 +241,7 @@ bool LdsLidar::InitLivoxLidar() {
 void LdsLidar::SetLidarPubHandle() {
   pub_handler().SetPointCloudsCallback(LidarCommonCallback::OnLidarPointClounCb, g_lds_ldiar);
   pub_handler().SetImuDataCallback(LidarCommonCallback::LidarImuDataCallback, g_lds_ldiar);
+  pub_handler().SetLidarStateInfoCallback(LidarCommonCallback::LidarStateInfoCallback, g_lds_ldiar);
 
   double publish_freq = Lds::GetLdsFrequency();
   pub_handler().SetPointCloudConfig(publish_freq);

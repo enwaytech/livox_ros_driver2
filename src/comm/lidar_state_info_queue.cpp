@@ -22,46 +22,45 @@
 // SOFTWARE.
 //
 
-#include "parse_cfg_file.h"
-
-#include <iostream>
-#include <cstdio>
-#include <arpa/inet.h>
+#include "lidar_state_info_queue.h"
 
 namespace livox_ros {
 
-ParseCfgFile::ParseCfgFile(const std::string& path) : path_(path) {}
+void LidarStateInfoQueue::Push(StateInfoData* state_info_data) {
+  StateInfoData data;
+  data.lidar_type = state_info_data->lidar_type;
+  data.device_type = state_info_data->device_type;
+  data.handle = state_info_data->handle;
+  data.time_stamp = state_info_data->time_stamp;
 
-bool ParseCfgFile::ParseSummaryInfo(LidarSummaryInfo& lidar_summary_info) {
-  FILE* raw_file = std::fopen(path_.c_str(), "rb");
-  if (!raw_file) {
-    std::cout << "parse summary info failed, can not open file: " << path_ << std::endl;
+  // copy state info (rapidjson::Document type)
+  data.info.CopyFrom(state_info_data->info, data.info.GetAllocator());
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  state_info_queue_.push_back(std::move(data));
+}
+
+bool LidarStateInfoQueue::Pop(StateInfoData& state_info_data) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (state_info_queue_.empty()) {
     return false;
   }
+  state_info_data = std::move(state_info_queue_.front());
+  state_info_queue_.pop_front();
+  return true;
+}
 
-  char read_buffer[kMaxBufferSize];
-  rapidjson::FileReadStream config_file(raw_file, read_buffer, sizeof(read_buffer));
-  rapidjson::Document doc;
-  do {
-    if (doc.ParseStream(config_file).HasParseError()) {
-      break;
-    }
-    if (!doc.HasMember("lidar_summary_info") || !doc["lidar_summary_info"].IsObject()) {
-      break;
-    }
-    const rapidjson::Value &object = doc["lidar_summary_info"];
-    if (!object.HasMember("lidar_type") || !object["lidar_type"].IsUint()) {
-      break;
-    }
-    lidar_summary_info.lidar_type = static_cast<uint8_t>(object["lidar_type"].GetUint());
-    std::fclose(raw_file);
-    return true;
-  } while (false);
+bool LidarStateInfoQueue::Empty() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return state_info_queue_.empty();
+}
 
-  std::cout << "ParseSummaryInfo: parse lidar type failed. from path: " << path_ << std::endl;
-  std::fclose(raw_file);
-  return false;
+void LidarStateInfoQueue::Clear() {
+  std::list<StateInfoData> tmp_state_info_queue;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    state_info_queue_.swap(tmp_state_info_queue);
+  }
 }
 
 } // namespace livox_ros
-

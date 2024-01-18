@@ -184,6 +184,28 @@ void Lddc::DistributeImuData(void) {
   }
 }
 
+void Lddc::DistributeStateInfoData(void) {
+  if (!lds_) {
+    std::cout << "lds is not registered" << std::endl;
+    return;
+  }
+  if (lds_->IsRequestExit()) {
+    std::cout << "DistributeStateInfoData is RequestExit" << std::endl;
+    return;
+  }
+
+  lds_->state_info_semaphore_.Wait();
+  for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
+    uint32_t lidar_id = i;
+    LidarDevice *lidar = &lds_->lidars_[lidar_id];
+    LidarStateInfoQueue *state_info_data_queue = &lidar->state_info_data_queue;
+    if ((kConnectStateSampling != lidar->connect_state) || (state_info_data_queue == nullptr)) {
+      continue;
+    }
+    PollingLidarStateInfoData(lidar_id, lidar);
+  }
+}
+
 void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
   LidarDataQueue *p_queue = &lidar->data;
   if (p_queue == nullptr || p_queue->storage_packet == nullptr) {
@@ -205,6 +227,13 @@ void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
     PublishImuData(p_queue, index, lidar->livox_config.frame_id);
+  }
+}
+
+void Lddc::PollingLidarStateInfoData(uint8_t index, LidarDevice *lidar) {
+  LidarStateInfoQueue& p_queue = lidar->state_info_data_queue;
+  while (!lds_->IsRequestExit() && !p_queue.Empty()) {
+    PublishStateInfoData(p_queue, index, lidar->livox_config.frame_id);
   }
 }
 
@@ -771,6 +800,72 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
     }
 #endif
   }
+}
+
+void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, const uint8_t index, const std::string& lidar_frame_id) {
+  StateInfoData state_info_data;
+  if (!state_info_data_queue.Pop(state_info_data)) {
+    return;
+  }
+  // TODO parse state info data and do something with it
+  // TODO publish diagnostics ??
+  // TODO influence hearbeat somehow
+
+  uint64_t timestamp = state_info_data.time_stamp;
+
+
+  std::cout << "lidar_type" << (int)state_info_data.lidar_type << " handle: " << state_info_data.handle << " dev_type: "
+             << (int)state_info_data.device_type << " timestamp: " << timestamp << std::endl;
+
+  //  std::cout << info << std::endl;
+
+   assert(state_info_data.info.HasMember("hms_code"));
+
+   // Using a reference for consecutive access is handy and faster.
+    const rapidjson::Value& hms_codes = state_info_data.info["hms_code"];
+    assert(hms_codes.IsArray());
+    for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
+    {
+      uint32_t hms_code = hms_codes[i].GetUint();
+      
+      uint8_t error_level = hms_code & 0x000000ff;
+      uint16_t error_code = (hms_code & 0xffff0000) >> 16;
+
+      printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);
+      if (error_code == 0x0104)
+      {
+        printf("The window is dirty, which will influence the reliability of the point cloud\n");
+      }
+    }
+
+// -------------------------------------------------
+
+//   // TODO convert uint64_t stamp to ROS stamp
+// #ifdef BUILDING_ROS1
+//   imu_msg.header.stamp = ros::Time(timestamp / 1000000000.0);  // to ros time stamp
+// #elif defined BUILDING_ROS2
+//   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
+// #endif
+
+  // ImuMsg imu_msg;
+  // uint64_t timestamp;
+  // InitImuMsg(state_info_data, imu_msg, timestamp, lidar_frame_id);
+
+// #ifdef BUILDING_ROS1
+//   PublisherPtr publisher_ptr = GetCurrentImuPublisher(index);
+// #elif defined BUILDING_ROS2
+//   Publisher<ImuMsg>::SharedPtr publisher_ptr = std::dynamic_pointer_cast<Publisher<ImuMsg>>(GetCurrentImuPublisher(index));
+// #endif
+
+//   if (kOutputToRos == output_type_) {
+//     publisher_ptr->publish(imu_msg);
+//   } else {
+// #ifdef BUILDING_ROS1
+//     if (bag_ && enable_imu_bag_) {
+//       bag_->write(publisher_ptr->getTopic(), ros::Time(timestamp / 1000000000.0), imu_msg);
+//     }
+// #endif
+//   }
 }
 
 #ifdef BUILDING_ROS2

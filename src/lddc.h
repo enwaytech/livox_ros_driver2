@@ -89,6 +89,7 @@ class Lddc final {
   int RegisterLds(Lds *lds);
   void DistributePointCloudData(unsigned int index);
   void DistributeImuData(void);
+  void DistributeStateInfoData(void);
   void CreateBagFile(const std::string &file_name);
   void PrepareExit(void);
 
@@ -105,12 +106,14 @@ class Lddc final {
  private:
   void PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar);
   void PollingLidarImuData(uint8_t index, LidarDevice *lidar);
+  void PollingLidarStateInfoData(uint8_t index, LidarDevice *lidar);
 
   void PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
 
   void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id);
+  void PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, const uint8_t index, const std::string& lidar_frame_id);
 
   void InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id);
   void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);

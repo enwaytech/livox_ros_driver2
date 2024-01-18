@@ -107,7 +107,7 @@ void Lds::StorageImuData(ImuData* imu_data) {
   uint8_t index = 0;
   int ret = cache_index_.GetIndex(imu_data->lidar_type, device_num, index);
   if (ret != 0) {
-    printf("Storage point data failed, can not get index, lidar type:%u, device_num:%u.\n", imu_data->lidar_type, device_num);
+    printf("Storage imu data failed, can not get index, lidar type:%u, device_num:%u.\n", imu_data->lidar_type, device_num);
     return;
   }
 
@@ -163,6 +163,34 @@ void Lds::StoragePointData(PointFrame* frame) {
       continue;
     }
     PushLidarData(&lidar_point, index, base_time);
+  }
+}
+
+void Lds::StorageStateInfoData(StateInfoData* state_info_data)
+{
+  uint32_t device_num = 0;
+  if (state_info_data->lidar_type == kLivoxLidarType) {
+    device_num = state_info_data->handle;
+  } else {
+    printf("StorageStateInfoData failed, unknown lidar type:%u.\n", state_info_data->lidar_type);
+    return;
+  }
+
+  uint8_t index = 0;
+  int ret = cache_index_.GetIndex(state_info_data->lidar_type, device_num, index);
+  if (ret != 0) {
+    printf("StorageStateInfoData failed, can not get index, lidar type:%u, device_num:%u.\n", 
+            state_info_data->lidar_type, device_num);
+    return;
+  }
+
+  LidarDevice *p_lidar = &lidars_[index];
+  LidarStateInfoQueue* state_info_data_queue = &p_lidar->state_info_data_queue;
+  state_info_data_queue->Push(state_info_data);
+  if (!state_info_data_queue->Empty()) {
+    if (state_info_semaphore_.GetCount() <= 0) {
+      state_info_semaphore_.Signal();
+    }
   }
 }
 

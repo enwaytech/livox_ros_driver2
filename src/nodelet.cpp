@@ -116,6 +116,7 @@ livox_ros::Nodelet::onInit()
   }
 
   livox_node_->imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, livox_node_.get());
+  livox_node_->state_info_data_poll_thread_ = std::make_shared<std::thread>(&DriverNode::StateInfoDataPollThread, livox_node_.get());
 }
 
 void DriverNode::PointCloudDataPollThread(unsigned int index)
@@ -134,6 +135,16 @@ void DriverNode::ImuDataPollThread()
   std::this_thread::sleep_for(std::chrono::seconds(3));
   do {
     lddc_ptr_->DistributeImuData();
+    status = future_.wait_for(std::chrono::microseconds(0));
+  } while (status == std::future_status::timeout);
+}
+
+void DriverNode::StateInfoDataPollThread()
+{
+  std::future_status status;
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  do {
+    lddc_ptr_->DistributeStateInfoData();
     status = future_.wait_for(std::chrono::microseconds(0));
   } while (status == std::future_status::timeout);
 }
