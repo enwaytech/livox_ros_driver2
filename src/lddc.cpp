@@ -42,7 +42,8 @@
 
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <enway_msgs/ErrorCodeGeneric.h>
+#include <enway_msgs/ErrorArray.h>
+#include <enway_msgs/ErrorGeneric.h>
 
 namespace livox_ros
 {
@@ -839,27 +840,29 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
   uint64_t timestamp = state_info_data.time_stamp;
 
-  enway_msgs::ErrorCodeGeneric error_msg;
+  enway_msgs::ErrorArray errors_array_msg;
   #ifdef BUILDING_ROS1
     PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
-    error_msg.header.stamp = ros::Time(timestamp / 1000000000.0); 
+    errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0); 
   #elif defined BUILDING_ROS2
     throw std::logic_error("Function not implemented for ROS2, since enway_msgs::ErrorCodeGeneric is not implemented");
-    // error_msg.header.stamp = rclcpp::Time(timestamp);
+    // errors_array_msg.header.stamp = rclcpp::Time(timestamp);
   #endif
 
-  // TODO fill the message with the error codes - how to handle multiple codes???
-  // I think may have to use another msg which array of ErrorCodeGeneric - otherwise I can't force "deletion" of an error
-  //  once it disappears from the driver. With multiple msgs, one for each code, I could only track the last time a code appeared
-  // but maybe this is OK?? since the heartbeat have to track the timing anyway to discard flickering?
-  //  but then the heartbeat needs another timeout in whioch to "clear" an error, in addition to one to "trigger" and error
   for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
   {
     uint32_t hms_code = hms_codes[i].GetUint();
+    if (hms_code == 0)
+    {
+      continue;
+    }
     
+    // HMS code format: 4 Bytes: hms_bytes[3:2] = error code/ID, hms_bytes[1] = Reserved, hms_bytes[0] = severity level
+    // source: https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html
+    enway_msgs::ErrorGeneric error_msg;
+    error_msg.header = errors_array_msg.header;
     uint8_t error_level = hms_code & 0x000000ff;
-    // The ErrorCodeGeneric and Livox have the same value for severity levels
-    error_msg.severity = error_level;
+    error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity enum TODO use switch case??
 
     uint16_t error_code = (hms_code & 0xffff0000) >> 16;
     error_msg.error_code = error_code;
@@ -868,10 +871,12 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
     printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);
 
+    errors_array_msg.errors.push_back(error_msg);
   }
 
+  // TODO Only publish if there are errors ??
   if (kOutputToRos == output_type_) {
-    publisher_ptr->publish(error_msg);
+    publisher_ptr->publish(errors_array_msg);
   } else {
     // Do not support bagging error messages
   }
@@ -1021,7 +1026,7 @@ PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
     }
 
     *pub = new ros::Publisher;
-    **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorCodeGeneric>(name_str, queue_size);
+    **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorArray>(name_str, queue_size);
     DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
              queue_size);
   }
