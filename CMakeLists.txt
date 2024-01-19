@@ -37,6 +37,7 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   pcl_ros
   dust_filter_livox
+  enway_msgs
   nodelet
   pcl_conversions
 )

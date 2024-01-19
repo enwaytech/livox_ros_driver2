@@ -41,6 +41,9 @@
 #include "lds_lidar.h"
 
 #include <pcl_conversions/pcl_conversions.h>
+
+#include <enway_msgs/ErrorCodeGeneric.h>
+
 namespace livox_ros
 {
 
@@ -64,6 +67,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
   memset(private_imu_pub_, 0, sizeof(private_imu_pub_));
+  memset(private_error_pub_, 0, sizeof(private_error_pub_));
   memset(private_non_return_rays_pub_, 0, sizeof(private_non_return_rays_pub_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
@@ -128,6 +132,12 @@ Lddc::~Lddc() {
   for (uint32_t i = 0; i < kMaxSourceLidar; i++) {
     if (private_imu_pub_[i]) {
       delete private_imu_pub_[i];
+    }
+    if (private_error_pub_[i]) {
+      delete private_error_pub_[i];
+    }
+    if (private_non_return_rays_pub_[i]) {
+      delete private_non_return_rays_pub_[i];
     }
   }
 #endif
@@ -807,65 +817,66 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   if (!state_info_data_queue.Pop(state_info_data)) {
     return;
   }
-  // TODO parse state info data and do something with it
-  // TODO publish diagnostics ??
-  // TODO influence hearbeat somehow
 
-  uint64_t timestamp = state_info_data.time_stamp;
+  // There is a lot of information in the StateInfoData, including a lot of lidar configuration data
+  // For now, we are only interested in the error codes, but this method can be extended to handle other info
 
 
   std::cout << "lidar_type" << (int)state_info_data.lidar_type << " handle: " << state_info_data.handle << " dev_type: "
-             << (int)state_info_data.device_type << " timestamp: " << timestamp << std::endl;
-
+             << (int)state_info_data.device_type << " timestamp: " << state_info_data.time_stamp << std::endl;
   //  std::cout << info << std::endl;
 
-   assert(state_info_data.info.HasMember("hms_code"));
+  if (!state_info_data.info.HasMember("hms_code"))
+  {
+    return;
+  }
+  
+  const rapidjson::Value& hms_codes = state_info_data.info["hms_code"]; // Using a reference for consecutive access is handy and faster.
+  if (!hms_codes.IsArray())
+  {
+    return;
+  }
 
-   // Using a reference for consecutive access is handy and faster.
-    const rapidjson::Value& hms_codes = state_info_data.info["hms_code"];
-    assert(hms_codes.IsArray());
-    for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
-    {
-      uint32_t hms_code = hms_codes[i].GetUint();
-      
-      uint8_t error_level = hms_code & 0x000000ff;
-      uint16_t error_code = (hms_code & 0xffff0000) >> 16;
+  uint64_t timestamp = state_info_data.time_stamp;
 
-      printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);
-      if (error_code == 0x0104)
-      {
-        printf("The window is dirty, which will influence the reliability of the point cloud\n");
-      }
-    }
+  enway_msgs::ErrorCodeGeneric error_msg;
+  #ifdef BUILDING_ROS1
+    PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
+    error_msg.header.stamp = ros::Time(timestamp / 1000000000.0); 
+  #elif defined BUILDING_ROS2
+    throw std::logic_error("Function not implemented for ROS2, since enway_msgs::ErrorCodeGeneric is not implemented");
+    // error_msg.header.stamp = rclcpp::Time(timestamp);
+  #endif
 
-// -------------------------------------------------
+  // TODO fill the message with the error codes - how to handle multiple codes???
+  // I think may have to use another msg which array of ErrorCodeGeneric - otherwise I can't force "deletion" of an error
+  //  once it disappears from the driver. With multiple msgs, one for each code, I could only track the last time a code appeared
+  // but maybe this is OK?? since the heartbeat have to track the timing anyway to discard flickering?
+  //  but then the heartbeat needs another timeout in whioch to "clear" an error, in addition to one to "trigger" and error
+  for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
+  {
+    uint32_t hms_code = hms_codes[i].GetUint();
+    
+    uint8_t error_level = hms_code & 0x000000ff;
+    // The ErrorCodeGeneric and Livox have the same value for severity levels
+    error_msg.severity = error_level;
 
-//   // TODO convert uint64_t stamp to ROS stamp
-// #ifdef BUILDING_ROS1
-//   imu_msg.header.stamp = ros::Time(timestamp / 1000000000.0);  // to ros time stamp
-// #elif defined BUILDING_ROS2
-//   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
-// #endif
+    uint16_t error_code = (hms_code & 0xffff0000) >> 16;
+    error_msg.error_code = error_code;
 
-  // ImuMsg imu_msg;
-  // uint64_t timestamp;
-  // InitImuMsg(state_info_data, imu_msg, timestamp, lidar_frame_id);
+    // TODO get the description and suggested solution from the error code - need to add an enum for the mapping
 
-// #ifdef BUILDING_ROS1
-//   PublisherPtr publisher_ptr = GetCurrentImuPublisher(index);
-// #elif defined BUILDING_ROS2
-//   Publisher<ImuMsg>::SharedPtr publisher_ptr = std::dynamic_pointer_cast<Publisher<ImuMsg>>(GetCurrentImuPublisher(index));
-// #endif
+    printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);
 
-//   if (kOutputToRos == output_type_) {
-//     publisher_ptr->publish(imu_msg);
-//   } else {
-// #ifdef BUILDING_ROS1
-//     if (bag_ && enable_imu_bag_) {
-//       bag_->write(publisher_ptr->getTopic(), ros::Time(timestamp / 1000000000.0), imu_msg);
-//     }
-// #endif
-//   }
+  }
+
+  if (kOutputToRos == output_type_) {
+    publisher_ptr->publish(error_msg);
+  } else {
+    // Do not support bagging error messages
+  }
+
+  // TODO publish diagnostics
 }
 
 #ifdef BUILDING_ROS2
@@ -978,6 +989,40 @@ PublisherPtr Lddc::GetCurrentImuPublisher(uint8_t handle) {
     *pub = new ros::Publisher;
     **pub = cur_node_->GetNode().advertise<sensor_msgs::Imu>(name_str, queue_size);
     DRIVER_INFO(*cur_node_, "%s publish imu data, set ROS publisher queue size %d", name_str,
+             queue_size);
+  }
+
+  return *pub;
+}
+
+PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
+  ros::Publisher **pub = nullptr;
+  uint32_t queue_size = kMinEthPacketQueueSize;
+
+  if (use_multi_topic_) {
+    pub = &private_error_pub_[handle];
+    queue_size = queue_size * 2; // queue size is 64 for only one lidar
+  } else {
+    pub = &global_error_pub_;
+    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+  }
+
+  if (*pub == nullptr) {
+    char name_str[48];
+    memset(name_str, 0, sizeof(name_str));
+    if (use_multi_topic_) {
+      DRIVER_INFO(*cur_node_, "Support multi topics.");
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/error_%s",
+               ReplacePeriodByUnderline(ip_string).c_str());
+    } else {
+      DRIVER_INFO(*cur_node_, "Support only one topic.");
+      snprintf(name_str, sizeof(name_str), "livox/error");
+    }
+
+    *pub = new ros::Publisher;
+    **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorCodeGeneric>(name_str, queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
              queue_size);
   }
 

@@ -143,6 +143,7 @@ class Lddc final {
 
   PublisherPtr GetCurrentPublisher(uint8_t index);
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
+  PublisherPtr GetCurrentErrorPublisher(uint8_t index);
   PublisherPtr GetCurrentNonReturnRaysPublisher(uint8_t index);
 
  private:
@@ -165,6 +166,8 @@ class Lddc final {
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
+  PublisherPtr private_error_pub_[kMaxSourceLidar];
+  PublisherPtr global_error_pub_;
   PublisherPtr private_non_return_rays_pub_[kMaxSourceLidar];
   PublisherPtr global_non_return_rays_pub_;
   rosbag::Bag *bag_;
@@ -174,6 +177,8 @@ class Lddc final {
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
+  PublisherPtr private_error_pub_[kMaxSourceLidar];
+  PublisherPtr global_error_pub_;
 #endif
 
   livox_ros::DriverNode *cur_node_;
