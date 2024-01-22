@@ -25,6 +25,7 @@
 #include "lddc.h"
 #include "comm/comm.h"
 #include "comm/ldq.h"
+#include "comm/diagnostics_codes_table.h"
 
 #include <inttypes.h>
 #include <iostream>
@@ -35,7 +36,6 @@
 
 #include "livox_ros_driver2/livox_ros_types.h"
 #include "livox_ros_driver2/ros_headers.h"
-
 
 #include "driver_node.h"
 #include "lds_lidar.h"
@@ -866,9 +866,23 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     uint16_t error_code = (hms_code & 0xffff0000) >> 16;
     error_msg.error_code = error_code;
 
-    // TODO get the description and suggested solution from the error code - need to add an enum for the mapping
+    auto error_dec_iter = livox_ros::error_code_to_description_mapping.find(error_code);
+    if (error_dec_iter == livox_ros::error_code_to_description_mapping.end())
+    {
+      error_msg.description = "Unknown Error Code";
+      error_msg.suggested_solution = "Unknown Error Code";
+    }
+    else
+    {
+      ErrorDescription error_desc = error_dec_iter->second;
+      error_msg.description = error_desc.description;
+      error_msg.suggested_solution = error_desc.suggested_solution;
+    }
+    ErrorDescription error_desc = livox_ros::error_code_to_description_mapping.at(error_code);
+    error_msg.description = error_desc.description;
+    error_msg.suggested_solution = error_desc.suggested_solution;
 
-    printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);
+    printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);  // TODO rm
 
     errors_array_msg.errors.push_back(error_msg);
   }
@@ -876,7 +890,6 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   // keep the last errors array in the LidarDevice struct, so it can be used by the diagnostics updater
   lds_->lidars_[index].last_errors_array = errors_array_msg;
 
-  // TODO Only publish if there are errors ??
   if (kOutputToRos == output_type_) {
     publisher_ptr->publish(errors_array_msg);
   } else {
@@ -1119,11 +1132,11 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
   // int i = 0;
   for (const enway_msgs::ErrorGeneric error : errors.errors)
   {
-    std::cout << i << "produceDiagnostics lidar " << (int)index << ":\n\t level " << (int)error.severity << " code " 
+    std::cout << "produceDiagnostics lidar " << (int)index << ":\n\t level " << (int)error.severity << " code "
               << (int)error.error_code << " description " << error.description << " solution " << error.suggested_solution
               << std::endl;
 
-    std::string msg = "yey" + error.description + " " + error.suggested_solution;
+    std::string msg = error.description + " - " + error.suggested_solution;
     // std::string key;
     switch (error.severity)
     {
