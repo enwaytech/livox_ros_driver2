@@ -40,6 +40,7 @@
 #include "lidar_state_info_queue.h"
 #include "livox_ros_driver2/livox_point.h"
 
+#include <enway_msgs/ErrorArray.h>
 namespace livox_ros {
 
 /** Max lidar data source num */
@@ -321,6 +322,7 @@ typedef struct {
   LidarDataQueue data;
   LidarImuDataQueue imu_data;
   LidarStateInfoQueue state_info_data_queue;
+  enway_msgs::ErrorArray last_errors_array;
 
   uint32_t firmware_ver; /**< Firmware version of lidar  */
   UserLivoxLidarConfig livox_config;

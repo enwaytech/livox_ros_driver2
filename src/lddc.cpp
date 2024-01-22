@@ -822,7 +822,6 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   // There is a lot of information in the StateInfoData, including a lot of lidar configuration data
   // For now, we are only interested in the error codes, but this method can be extended to handle other info
 
-
   std::cout << "lidar_type" << (int)state_info_data.lidar_type << " handle: " << state_info_data.handle << " dev_type: "
              << (int)state_info_data.device_type << " timestamp: " << state_info_data.time_stamp << std::endl;
   //  std::cout << info << std::endl;
@@ -862,7 +861,7 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     enway_msgs::ErrorGeneric error_msg;
     error_msg.header = errors_array_msg.header;
     uint8_t error_level = hms_code & 0x000000ff;
-    error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity enum TODO use switch case??
+    error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity 
 
     uint16_t error_code = (hms_code & 0xffff0000) >> 16;
     error_msg.error_code = error_code;
@@ -874,6 +873,9 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     errors_array_msg.errors.push_back(error_msg);
   }
 
+  // keep the last errors array in the LidarDevice struct, so it can be used by the diagnostics updater
+  lds_->lidars_[index].last_errors_array = errors_array_msg;
+
   // TODO Only publish if there are errors ??
   if (kOutputToRos == output_type_) {
     publisher_ptr->publish(errors_array_msg);
@@ -881,7 +883,7 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     // Do not support bagging error messages
   }
 
-  // TODO publish diagnostics
+  GetCurrentDiagnosticUpdater(index)->update(); // plus set error lvl in class member for each lidar
 }
 
 #ifdef BUILDING_ROS2
@@ -1066,6 +1068,91 @@ PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
   }
 
   return *pub;
+}
+
+
+DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
+  // ros::Publisher **pub = nullptr;
+  // uint32_t queue_size = kMinEthPacketQueueSize;
+
+  // always use multiple diagnostic updaters, so we can call the right diagnostics task
+  diagnostic_updater::Updater** updater = &diagnostic_updaters_[index];
+  // queue_size = queue_size * 2; // queue size is 64 for only one lidar
+
+  if (*updater == nullptr) {
+  // if (!updater) {
+    // char name_str[48];
+    // memset(name_str, 0, sizeof(name_str));
+    // if (use_multi_topic_) {
+      // DRIVER_INFO(*cur_node_, "Support multi topics.");
+    std::string ip_string = ReplacePeriodByUnderline(IpNumToString(lds_->lidars_[index].handle));
+
+    // init a new diagnostic updater
+    *updater = new diagnostic_updater::Updater;
+    (*updater)->setHardwareIDf("livox_lidar_%s_driver", ip_string.c_str());
+
+    std::string task_name = "livox_lidar_" + ip_string + "_diagnostics";
+    (*updater)->add(task_name, 
+                [this, index] (diagnostic_updater::DiagnosticStatusWrapper& status) {
+                  produceDiagnostics(status, index);
+                });
+    // snprintf(name_str, sizeof(name_str), "livox/non_return_rays_%s",
+    //          ReplacePeriodByUnderline(ip_string).c_str());    
+    // } else {
+    //   DRIVER_INFO(*cur_node_, "Support only one topic.");
+    //   snprintf(name_str, sizeof(name_str), "livox/non_return_rays");
+    // }
+
+    // *pub = new ros::Publisher;
+    // **pub = cur_node_->GetNode().advertise<sensor_msgs::PointCloud2>(name_str, queue_size);
+    DRIVER_INFO(*cur_node_, "Init diagnostics updater for lidar %d ", (int)lds_->lidars_[index].handle);
+  }
+
+  return *updater;
+}
+
+void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index) {
+  enway_msgs::ErrorArray errors = lds_->lidars_[index].last_errors_array;
+
+  stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
+
+  // int i = 0;
+  for (const enway_msgs::ErrorGeneric error : errors.errors)
+  {
+    std::cout << i << "produceDiagnostics lidar " << (int)index << ":\n\t level " << (int)error.severity << " code " 
+              << (int)error.error_code << " description " << error.description << " solution " << error.suggested_solution
+              << std::endl;
+
+    std::string msg = "yey" + error.description + " " + error.suggested_solution;
+    // std::string key;
+    switch (error.severity)
+    {
+    case enway_msgs::ErrorGeneric::Info:
+      break;
+
+    case enway_msgs::ErrorGeneric::Warning:
+      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::WARN, msg);
+      // key = "Warning " + i; // TODO this doesn't append i !!!
+      // stat.add(key, msg);
+      break;
+
+    case enway_msgs::ErrorGeneric::Error:
+    case enway_msgs::ErrorGeneric::Fatal:
+      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::ERROR, msg);
+      // key = "Error " + i;
+      // stat.add(key, msg);
+      break;
+
+    default:
+      std::cout << "Unknown error severity: " << (int)error.severity << std::endl;
+      DRIVER_WARN(*cur_node_, "Ignoring unknown error severity: %d", (int)error.severity);
+      break;
+    }
+
+    // std::cout << "key: " << key << std::endl;
+
+    // i++;
+  }
 }
 
 #elif defined BUILDING_ROS2
