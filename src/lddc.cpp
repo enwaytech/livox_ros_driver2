@@ -1088,9 +1088,9 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
 
     // init a new diagnostic updater
     *updater = new diagnostic_updater::Updater;
-    (*updater)->setHardwareIDf("livox_lidar_%s_driver", ip_string.c_str());
+    (*updater)->setHardwareIDf("livox_driver_%s", ip_string.c_str());
 
-    std::string task_name = "livox_lidar_" + ip_string + "_diagnostics";
+    std::string task_name = "livox_" + ip_string;
     (*updater)->add(task_name, 
                 [this, index] (diagnostic_updater::DiagnosticStatusWrapper& status) {
                   produceDiagnostics(status, index);
