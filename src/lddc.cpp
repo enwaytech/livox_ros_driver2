@@ -1028,11 +1028,10 @@ PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
     if (use_multi_topic_) {
       DRIVER_INFO(*cur_node_, "Support multi topics.");
       std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
-      snprintf(name_str, sizeof(name_str), "livox/error_%s",
-               ReplacePeriodByUnderline(ip_string).c_str());
+      snprintf(name_str, sizeof(name_str), "livox/errors_%s", ReplacePeriodByUnderline(ip_string).c_str());
     } else {
       DRIVER_INFO(*cur_node_, "Support only one topic.");
-      snprintf(name_str, sizeof(name_str), "livox/error");
+      snprintf(name_str, sizeof(name_str), "livox/errors");
     }
 
     *pub = new ros::Publisher;
@@ -1091,10 +1090,9 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
     (*updater)->setHardwareIDf("livox_driver_%s", ip_string.c_str());
 
     std::string task_name = "livox_" + ip_string;
-    (*updater)->add(task_name, 
-                [this, index] (diagnostic_updater::DiagnosticStatusWrapper& status) {
-                  produceDiagnostics(status, index);
-                });
+    (*updater)->add(task_name, [this, index](diagnostic_updater::DiagnosticStatusWrapper& status) {
+      produceDiagnostics(status, index);
+    });
 
     DRIVER_INFO(*cur_node_, "Init diagnostics updater for lidar %d ", (int)lds_->lidars_[index].handle);
   }
@@ -1107,6 +1105,7 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
 
   stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
 
+  int i = 0;
   for (const enway_msgs::ErrorGeneric error : errors.errors)
   {
     std::string msg = error.description + " - " + error.suggested_solution;
@@ -1117,17 +1116,20 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
 
     case enway_msgs::ErrorGeneric::Warning:
       stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::WARN, msg);
+      stat.add("Warning " + std::to_string(i), msg);
       break;
 
     case enway_msgs::ErrorGeneric::Error:
     case enway_msgs::ErrorGeneric::Fatal:
       stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::ERROR, msg);
+      stat.add("Error " + std::to_string(i), msg);
       break;
 
     default:
       DRIVER_WARN(*cur_node_, "Ignoring unknown error severity: %d", (int)error.severity);
       break;
     }
+    i++;
   }
 }
 
