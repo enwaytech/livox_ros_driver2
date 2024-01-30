@@ -1108,7 +1108,11 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
   int i = 0;
   for (const enway_msgs::ErrorGeneric error : errors.errors)
   {
-    std::string msg = error.description + " - " + error.suggested_solution;
+    std::stringstream stream;
+    stream << error.description << " - " << error.suggested_solution << " (error code: 0x" << std::hex
+           << error.error_code << ")";
+    std::string msg(stream.str());
+
     switch (error.severity)
     {
     case enway_msgs::ErrorGeneric::Info:
