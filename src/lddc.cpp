@@ -1094,7 +1094,7 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
     DRIVER_INFO(*cur_node_, "Publish diagnostics, HW ID: %s", ip_string.c_str());
     // init a new diagnostic updater
     *updater = new diagnostic_updater::Updater;
-    (*updater)->setHardwareIDf("livox_driver_%s", ip_string.c_str());
+    (*updater)->setHardwareID("livox_driver_" + ip_string);
 
     std::string task_name = "livox_" + ip_string;
     (*updater)->add(task_name, [this, index](diagnostic_updater::DiagnosticStatusWrapper& status) {
