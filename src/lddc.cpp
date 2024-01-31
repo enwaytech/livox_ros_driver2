@@ -825,7 +825,7 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   {
     return;
   }
-  
+
   const rapidjson::Value& hms_codes = state_info_data.info["hms_code"]; // Using a reference for consecutive access is handy and faster.
   if (!hms_codes.IsArray())
   {
@@ -837,7 +837,7 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   enway_msgs::ErrorArray errors_array_msg;
   #ifdef BUILDING_ROS1
     PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
-    errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0); 
+    errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0);
   #elif defined BUILDING_ROS2
     throw std::logic_error("Function not implemented for ROS2, since enway_msgs::ErrorCodeGeneric is not implemented");
     // errors_array_msg.header.stamp = rclcpp::Time(timestamp);
@@ -850,13 +850,13 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     {
       continue;
     }
-    
+
     // HMS code format: 4 Bytes: hms_bytes[3:2] = error code/ID, hms_bytes[1] = Reserved, hms_bytes[0] = severity level
     // source: https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html
     enway_msgs::ErrorGeneric error_msg;
     error_msg.header = errors_array_msg.header;
     uint8_t error_level = hms_code & 0x000000ff;
-    error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity 
+    error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity
 
     uint16_t error_code = (hms_code & 0xffff0000) >> 16;
     error_msg.error_code = error_code;
@@ -1076,7 +1076,6 @@ PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
 
   return *pub;
 }
-
 
 DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
   // always use multiple diagnostic updaters, so we can call the right diagnostics task
