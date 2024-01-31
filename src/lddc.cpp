@@ -70,6 +70,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   memset(private_imu_pub_, 0, sizeof(private_imu_pub_));
   memset(private_error_pub_, 0, sizeof(private_error_pub_));
   memset(private_non_return_rays_pub_, 0, sizeof(private_non_return_rays_pub_));
+  memset(diagnostic_updaters_, 0, sizeof(diagnostic_updaters_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
   global_non_return_rays_pub_ = nullptr;
@@ -139,6 +140,9 @@ Lddc::~Lddc() {
     }
     if (private_non_return_rays_pub_[i]) {
       delete private_non_return_rays_pub_[i];
+    }
+    if (diagnostic_updaters_[i]) {
+      delete diagnostic_updaters_[i];
     }
   }
 #endif
@@ -1084,6 +1088,10 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
   if (*updater == nullptr) {
     std::string ip_string = ReplacePeriodByUnderline(IpNumToString(lds_->lidars_[index].handle));
 
+    if (!use_multi_topic_) {
+      DRIVER_WARN(*cur_node_, "Diagnostics publisher only support multi");
+    }
+    DRIVER_INFO(*cur_node_, "Publish diagnostics, HW ID: %s", ip_string.c_str());
     // init a new diagnostic updater
     *updater = new diagnostic_updater::Updater;
     (*updater)->setHardwareIDf("livox_driver_%s", ip_string.c_str());
