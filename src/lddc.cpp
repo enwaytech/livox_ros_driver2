@@ -881,8 +881,6 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     error_msg.description = error_desc.description;
     error_msg.suggested_solution = error_desc.suggested_solution;
 
-    printf("hms_codes[%d] = 0x%08x  :  level = 0x%02x  ,  code = 0x%04x\n", i, hms_code, error_level, error_code);  // TODO rm
-
     errors_array_msg.errors.push_back(error_msg);
   }
 
