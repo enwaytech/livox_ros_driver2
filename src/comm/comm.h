@@ -41,6 +41,7 @@
 #include "livox_ros_driver2/livox_point.h"
 
 #include <enway_msgs/ErrorArray.h>
+
 namespace livox_ros {
 
 /** Max lidar data source num */
@@ -83,7 +84,7 @@ constexpr uint32_t kMaxBufferSize = 0x8000;  // 32k bytes
 /** Device Line Number **/
 const uint8_t kLineNumberDefault = 1;
 const uint8_t kLineNumberMid360 = 4;
-const uint8_t kLineNumberHAP = 6;    
+const uint8_t kLineNumberHAP = 6;
 
 // SDK related
 typedef enum {

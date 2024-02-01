@@ -30,9 +30,8 @@
 #include "driver_node.h"
 #include "lds.h"
 
-#include <string>
 #include <optional>
-#include <memory>
+#include <string>
 
 #include <diagnostic_updater/diagnostic_updater.h>
 
@@ -184,8 +183,6 @@ class Lddc final {
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
-  PublisherPtr private_error_pub_[kMaxSourceLidar];
-  PublisherPtr global_error_pub_;
 #endif
 
   livox_ros::DriverNode *cur_node_;

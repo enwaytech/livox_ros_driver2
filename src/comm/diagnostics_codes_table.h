@@ -34,11 +34,15 @@ typedef struct ErrorDescription
   std::string description;
   std::string suggested_solution;
 
-  ErrorDescription(std::string description, std::string suggested_solution) :
-    description(description), suggested_solution(suggested_solution) {}
+  ErrorDescription(std::string description, std::string suggested_solution)
+    : description(description)
+    , suggested_solution(suggested_solution)
+  {
+  }
 } ErrorDescription;
 
-// Taken from https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html#diagnostic-codes-table
+// Taken from
+// https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html#diagnostic-codes-table
 const std::unordered_map<int, ErrorDescription> error_code_to_description_mapping {
     // { name, timeout, topic }
     {0x0103, {"Environment temperature is relatively high", "Please check the environment temperature and losing heat measures"}},
@@ -52,6 +56,7 @@ const std::unordered_map<int, ErrorDescription> error_code_to_description_mappin
     {0x0116, {"Abnormal external voltage", "Please check the external voltage"}},
     {0x0117, {"Abnormal lidar parameters", "Please try to restart the device to restore"}},
     {0x0201, {"Scan module is heating", "Please wait for the scan module heating"}},
+    // errors 0x0210-0x0219 can be either warning or fatal, we use the error version of the wording
     {0x0210, {"Scan module is abnormal, the system is trying to recover", "Please wait, if it lasts too long, please try restarting the device to restore"}},
     {0x0211, {"Scan module is abnormal, the system is trying to recover", "Please wait, if it lasts too long, please try restarting the device to restore"}},
     {0x0212, {"Scan module is abnormal, the system is trying to recover", "Please wait, if it lasts too long, please try restarting the device to restore"}},

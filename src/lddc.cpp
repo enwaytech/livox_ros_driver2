@@ -73,6 +73,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   memset(diagnostic_updaters_, 0, sizeof(diagnostic_updaters_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
+  global_error_pub_ = nullptr;
   global_non_return_rays_pub_ = nullptr;
   cur_node_ = nullptr;
   bag_ = nullptr;
@@ -119,6 +120,14 @@ Lddc::~Lddc() {
 
   if (global_imu_pub_) {
     delete global_imu_pub_;
+  }
+
+  if (global_error_pub_) {
+    delete global_error_pub_;
+  }
+
+  if (global_non_return_rays_pub_) {
+    delete global_non_return_rays_pub_;
   }
 #endif
 
@@ -201,11 +210,11 @@ void Lddc::DistributeImuData(void) {
 
 void Lddc::DistributeStateInfoData(void) {
   if (!lds_) {
-    std::cout << "lds is not registered" << std::endl;
+    DRIVER_ERROR(*cur_node_, "lds is not registered");
     return;
   }
   if (lds_->IsRequestExit()) {
-    std::cout << "DistributeStateInfoData is RequestExit" << std::endl;
+    DRIVER_ERROR(*cur_node_, "DistributeStateInfoData is RequestExit");
     return;
   }
 
@@ -850,7 +859,7 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
   {
     uint32_t hms_code = hms_codes[i].GetUint();
-    if (hms_code == 0)
+    if (hms_code == 0)  // 0 means no error
     {
       continue;
     }
@@ -865,21 +874,18 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     uint16_t error_code = (hms_code & 0xffff0000) >> 16;
     error_msg.error_code = error_code;
 
-    auto error_dec_iter = livox_ros::error_code_to_description_mapping.find(error_code);
-    if (error_dec_iter == livox_ros::error_code_to_description_mapping.end())
+    auto error_desc_iter = livox_ros::error_code_to_description_mapping.find(error_code);
+    if (error_desc_iter == livox_ros::error_code_to_description_mapping.end())
     {
       error_msg.description = "Unknown Error Code";
       error_msg.suggested_solution = "Unknown Error Code";
     }
     else
     {
-      ErrorDescription error_desc = error_dec_iter->second;
+      ErrorDescription error_desc = error_desc_iter->second;
       error_msg.description = error_desc.description;
       error_msg.suggested_solution = error_desc.suggested_solution;
     }
-    ErrorDescription error_desc = livox_ros::error_code_to_description_mapping.at(error_code);
-    error_msg.description = error_desc.description;
-    error_msg.suggested_solution = error_desc.suggested_solution;
 
     errors_array_msg.errors.push_back(error_msg);
   }
@@ -889,11 +895,10 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
   if (kOutputToRos == output_type_) {
     publisher_ptr->publish(errors_array_msg);
+    GetCurrentDiagnosticUpdater(index)->update(); // produce and publish diagnostics (rate-limited)
   } else {
     // Do not support bagging error messages
   }
-
-  GetCurrentDiagnosticUpdater(index)->update(); // plus set error lvl in class member for each lidar
 }
 
 #ifdef BUILDING_ROS2
@@ -1089,7 +1094,6 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
     if (!use_multi_topic_) {
       DRIVER_WARN(*cur_node_, "Diagnostics publisher only support multi");
     }
-    DRIVER_INFO(*cur_node_, "Publish diagnostics, HW ID: %s", ip_string.c_str());
     // init a new diagnostic updater
     *updater = new diagnostic_updater::Updater;
     (*updater)->setHardwareID("livox_driver_" + ip_string);
@@ -1099,7 +1103,10 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
       produceDiagnostics(status, index);
     });
 
-    DRIVER_INFO(*cur_node_, "Init diagnostics updater for lidar %d ", (int)lds_->lidars_[index].handle);
+    DRIVER_INFO(*cur_node_,
+                "Publish diagnostics for lidar %d , HW ID: %s",
+                (int)lds_->lidars_[index].handle,
+                ip_string.c_str());
   }
 
   return *updater;
@@ -1111,7 +1118,7 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
   stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
 
   int i = 0;
-  for (const enway_msgs::ErrorGeneric error : errors.errors)
+  for (const enway_msgs::ErrorGeneric& error : errors.errors)
   {
     std::stringstream stream;
     stream << error.description << " - " << error.suggested_solution << " (error code: 0x" << std::hex

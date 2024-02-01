@@ -161,7 +161,7 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
   RawPacket packet = {};
   packet.handle = handle;
   packet.lidar_type = LidarProtoType::kLivoxLidarType;
-  packet.extrinsic_enable = false; 
+  packet.extrinsic_enable = false;
   if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeIndustrialHAP) {
     packet.line_num = kLineNumberHAP;
   } else if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeMid360) {
@@ -208,7 +208,7 @@ PubHandler::OnLivoxLidarStateInfoCallback(const uint32_t handle,
     state_info.info.Parse(info);
     if (!state_info.info.IsObject())
     {
-      std::cout << "Failed to parse the json string" << std::endl;
+      std::cout << "OnLivoxLidarStateInfoCallback: Failed to parse the state_info json string" << std::endl;
       return;
     }
 
@@ -253,7 +253,7 @@ void PubHandler::CheckTimer(uint32_t id) {
     lidar_point.points_num = points_[id].size();
     lidar_point.points = points_[id].data();
     frame_.lidar_num++;
-    
+
     if (frame_.lidar_num != 0) {
       PublishPointCloud();
       frame_.lidar_num = 0;
@@ -385,7 +385,7 @@ void LidarPubHandler::PointCloudProcess(RawPacket & pkt) {
     static bool flag = false;
     if (!flag) {
       std::cout << "error, unsupported protocol type: " << static_cast<int>(pkt.lidar_type) << std::endl;
-      flag = true;      
+      flag = true;
     }
   }
 }
