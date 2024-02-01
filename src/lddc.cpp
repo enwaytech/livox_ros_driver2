@@ -1104,9 +1104,9 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
     });
 
     DRIVER_INFO(*cur_node_,
-                "Publish diagnostics for lidar %d , HW ID: %s",
-                (int)lds_->lidars_[index].handle,
-                ip_string.c_str());
+                "Publish diagnostics for lidar with IP %s, diagnostics hardware_id: %s",
+                ip_string.c_str(),
+                ("livox_driver_" + ip_string).c_str());
   }
 
   return *updater;
