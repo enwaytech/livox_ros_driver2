@@ -1084,9 +1084,9 @@ PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
   return *pub;
 }
 
-DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
+DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
   // always use multiple diagnostic updaters, so we can call the right diagnostics task
-  diagnostic_updater::Updater** updater = &diagnostic_updaters_[index];
+  DiagnosticUpdaterFinal** updater = &diagnostic_updaters_[index];
 
   if (*updater == nullptr) {
     std::string ip_string = ReplacePeriodByUnderline(IpNumToString(lds_->lidars_[index].handle));
@@ -1095,7 +1095,7 @@ DiagnosticUpdaterPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
       DRIVER_WARN(*cur_node_, "Diagnostics publisher only support multi");
     }
     // init a new diagnostic updater
-    *updater = new diagnostic_updater::Updater;
+    *updater = new DiagnosticUpdaterFinal;
     (*updater)->setHardwareID("livox_driver_" + ip_string);
 
     std::string task_name = "livox_" + ip_string;

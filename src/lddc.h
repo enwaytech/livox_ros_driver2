@@ -62,7 +62,11 @@ using PointField = sensor_msgs::PointField;
 using CustomMsg = livox_ros_driver2::CustomMsg;
 using CustomPoint = livox_ros_driver2::CustomPoint;
 using ImuMsg = sensor_msgs::Imu;
-using DiagnosticUpdaterPtr = diagnostic_updater::Updater*;
+
+// Suppress `delete-non-virtual-dtor` warning by using final class, as diagnostic_updater::Updater does not have a virtual
+// destructor and is not marked as final. Otherwise calling delete Updater* generates a compilation warning.
+struct DiagnosticUpdaterFinal final : diagnostic_updater::Updater {}; //
+using DiagnosticUpdaterFinalPtr = DiagnosticUpdaterFinal*;
 #elif defined BUILDING_ROS2
 template <typename MessageT> using Publisher = rclcpp::Publisher<MessageT>;
 using PublisherPtr = std::shared_ptr<rclcpp::PublisherBase>;
@@ -148,7 +152,7 @@ class Lddc final {
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
   PublisherPtr GetCurrentErrorPublisher(uint8_t index);
   PublisherPtr GetCurrentNonReturnRaysPublisher(uint8_t index);
-  DiagnosticUpdaterPtr GetCurrentDiagnosticUpdater(uint8_t index);
+  DiagnosticUpdaterFinalPtr GetCurrentDiagnosticUpdater(uint8_t index);
   void produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index);
 
  private:
@@ -175,7 +179,7 @@ class Lddc final {
   PublisherPtr global_error_pub_;
   PublisherPtr private_non_return_rays_pub_[kMaxSourceLidar];
   PublisherPtr global_non_return_rays_pub_;
-  DiagnosticUpdaterPtr diagnostic_updaters_[kMaxSourceLidar];
+  DiagnosticUpdaterFinalPtr diagnostic_updaters_[kMaxSourceLidar];
   rosbag::Bag *bag_;
 
 #elif defined BUILDING_ROS2
