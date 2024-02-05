@@ -234,7 +234,6 @@ void DriverNode::ImuDataPollThread()
 void DriverNode::StateInfoDataPollThread()
 {
   std::future_status status;
-  std::this_thread::sleep_for(std::chrono::seconds(3));
   do {
     lddc_ptr_->DistributeStateInfoData();
     status = future_.wait_for(std::chrono::microseconds(0));
