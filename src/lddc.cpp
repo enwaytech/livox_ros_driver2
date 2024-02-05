@@ -853,7 +853,6 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
     errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0);
   #elif defined BUILDING_ROS2
     throw std::logic_error("Function not implemented for ROS2, since enway_msgs::ErrorCodeGeneric is not implemented");
-    // errors_array_msg.header.stamp = rclcpp::Time(timestamp);
   #endif
 
   for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t

@@ -208,7 +208,7 @@ PubHandler::OnLivoxLidarStateInfoCallback(const uint32_t handle,
     state_info.info.Parse(info);
     if (!state_info.info.IsObject())
     {
-      std::cout << "OnLivoxLidarStateInfoCallback: Failed to parse the state_info json string" << std::endl;
+      std::cerr << "OnLivoxLidarStateInfoCallback: Failed to parse the state_info json string" << std::endl;
       return;
     }
 
