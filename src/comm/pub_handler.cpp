@@ -29,6 +29,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <rapidjson/document.h>
 namespace livox_ros {
 
 std::atomic<bool> PubHandler::is_timestamp_sync_;
@@ -119,6 +120,13 @@ void PubHandler::SetPointCloudsCallback(PointCloudsCallback cb, void* client_dat
   lidar_listen_id_ = LivoxLidarAddPointCloudObserver(OnLivoxLidarPointCloudCallback, this);
 }
 
+void PubHandler::SetLidarStateInfoCallback(StateInfoCallback cb, void* client_data) {
+  state_info_client_data_ = client_data;
+  state_info_callback_ = cb;
+
+  SetLivoxLidarInfoCallback(OnLivoxLidarStateInfoCallback, this);
+}
+
 void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t dev_type,
                                                 LivoxLidarEthernetPacket *data, void *client_data) {
   PubHandler* self = (PubHandler*)client_data;
@@ -153,7 +161,7 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
   RawPacket packet = {};
   packet.handle = handle;
   packet.lidar_type = LidarProtoType::kLivoxLidarType;
-  packet.extrinsic_enable = false; 
+  packet.extrinsic_enable = false;
   if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeIndustrialHAP) {
     packet.line_num = kLineNumberHAP;
   } else if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeMid360) {
@@ -173,6 +181,39 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
     self->raw_packet_queue_.push_back(packet);
   }
     self->packet_condition_.notify_one();
+
+  return;
+}
+
+void
+PubHandler::OnLivoxLidarStateInfoCallback(const uint32_t handle,
+                                          const uint8_t dev_type,
+                                          const char* info,
+                                          void* client_data)
+{
+  PubHandler* self = (PubHandler*)client_data;
+  if (!self)
+  {
+    return;
+  }
+
+  if (self->state_info_callback_)
+  {
+    StateInfoData state_info;
+    state_info.lidar_type = static_cast<uint8_t>(LidarProtoType::kLivoxLidarType);
+    state_info.device_type = dev_type;  // corresponds to LivoxLidarDeviceType
+    state_info.handle = handle;
+    state_info.time_stamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+
+    state_info.info.Parse(info);
+    if (!state_info.info.IsObject())
+    {
+      std::cerr << "OnLivoxLidarStateInfoCallback: Failed to parse the state_info json string" << std::endl;
+      return;
+    }
+
+    self->state_info_callback_(&state_info, self->state_info_client_data_);
+  }
 
   return;
 }
@@ -212,7 +253,7 @@ void PubHandler::CheckTimer(uint32_t id) {
     lidar_point.points_num = points_[id].size();
     lidar_point.points = points_[id].data();
     frame_.lidar_num++;
-    
+
     if (frame_.lidar_num != 0) {
       PublishPointCloud();
       frame_.lidar_num = 0;
@@ -344,7 +385,7 @@ void LidarPubHandler::PointCloudProcess(RawPacket & pkt) {
     static bool flag = false;
     if (!flag) {
       std::cout << "error, unsupported protocol type: " << static_cast<int>(pkt.lidar_type) << std::endl;
-      flag = true;      
+      flag = true;
     }
   }
 }

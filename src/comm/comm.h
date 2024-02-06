@@ -37,7 +37,10 @@
 #include <map>
 
 #include "lidar_imu_data_queue.h"
+#include "lidar_state_info_queue.h"
 #include "livox_ros_driver2/livox_point.h"
+
+#include <enway_msgs/ErrorArray.h>
 
 namespace livox_ros {
 
@@ -81,7 +84,7 @@ constexpr uint32_t kMaxBufferSize = 0x8000;  // 32k bytes
 /** Device Line Number **/
 const uint8_t kLineNumberDefault = 1;
 const uint8_t kLineNumberMid360 = 4;
-const uint8_t kLineNumberHAP = 6;    
+const uint8_t kLineNumberHAP = 6;
 
 // SDK related
 typedef enum {
@@ -319,6 +322,8 @@ typedef struct {
 
   LidarDataQueue data;
   LidarImuDataQueue imu_data;
+  LidarStateInfoQueue state_info_data_queue;
+  enway_msgs::ErrorArray last_errors_array;
 
   uint32_t firmware_ver; /**< Firmware version of lidar  */
   UserLivoxLidarConfig livox_config;

@@ -79,7 +79,7 @@ Visualization Manager:
       Size (Pixels): 2
       Size (m): 0.004999999888241291
       Style: Points
-      Topic: /livox/lidar
+      Topic: /livox_ros_driver2_nodelet_manager_nodelet/livox/lidar_192_168_1_111
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true

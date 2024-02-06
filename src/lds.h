@@ -45,6 +45,7 @@ class Lds {
   void StorageImuData(ImuData* imu_data);
   void StoragePointData(PointFrame* frame);
   void StorageLvxPointData(PointFrame* frame);
+  void StorageStateInfoData(StateInfoData* state_info_data);
 
   int8_t GetHandle(const uint8_t lidar_type, const PointPacket* lidar_point);
   void PushLidarData(PointPacket* lidar_data, const uint8_t index, const uint64_t base_time);
@@ -70,6 +71,7 @@ class Lds {
   LidarDevice lidars_[kMaxSourceLidar]; /**< The index is the handle */
   Semaphore pcd_semaphore_[kMaxSourceLidar];
   Semaphore imu_semaphore_;
+  Semaphore state_info_semaphore_;
   static CacheIndex cache_index_;
  protected:
   double publish_freq_;

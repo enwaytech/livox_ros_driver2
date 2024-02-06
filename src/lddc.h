@@ -27,11 +27,13 @@
 
 #include "livox_ros_driver2/livox_ros_driver2.h"
 #include "livox_ros_driver2/livox_ros_types.h"
-
 #include "driver_node.h"
 #include "lds.h"
-#include <string>
+
 #include <optional>
+#include <string>
+
+#include <diagnostic_updater/diagnostic_updater.h>
 
 #include <dust_filter_livox/dust_filter.h>
 
@@ -60,6 +62,11 @@ using PointField = sensor_msgs::PointField;
 using CustomMsg = livox_ros_driver2::CustomMsg;
 using CustomPoint = livox_ros_driver2::CustomPoint;
 using ImuMsg = sensor_msgs::Imu;
+
+// Suppress `delete-non-virtual-dtor` warning by using final class, as diagnostic_updater::Updater does not have a virtual
+// destructor and is not marked as final. Otherwise calling delete Updater* generates a compilation warning.
+struct DiagnosticUpdaterFinal final : diagnostic_updater::Updater {}; //
+using DiagnosticUpdaterFinalPtr = DiagnosticUpdaterFinal*;
 #elif defined BUILDING_ROS2
 template <typename MessageT> using Publisher = rclcpp::Publisher<MessageT>;
 using PublisherPtr = std::shared_ptr<rclcpp::PublisherBase>;
@@ -89,6 +96,7 @@ class Lddc final {
   int RegisterLds(Lds *lds);
   void DistributePointCloudData(unsigned int index);
   void DistributeImuData(void);
+  void DistributeStateInfoData(void);
   void CreateBagFile(const std::string &file_name);
   void PrepareExit(void);
 
@@ -105,12 +113,14 @@ class Lddc final {
  private:
   void PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar);
   void PollingLidarImuData(uint8_t index, LidarDevice *lidar);
+  void PollingLidarStateInfoData(uint8_t index, LidarDevice *lidar);
 
   void PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
   void PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string& frame_id);
 
   void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id);
+  void PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, const uint8_t index, const std::string& lidar_frame_id);
 
   void InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id);
   void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
@@ -140,7 +150,10 @@ class Lddc final {
 
   PublisherPtr GetCurrentPublisher(uint8_t index);
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
+  PublisherPtr GetCurrentErrorPublisher(uint8_t index);
   PublisherPtr GetCurrentNonReturnRaysPublisher(uint8_t index);
+  DiagnosticUpdaterFinalPtr GetCurrentDiagnosticUpdater(uint8_t index);
+  void produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index);
 
  private:
   uint8_t transfer_format_;
@@ -162,8 +175,11 @@ class Lddc final {
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
+  PublisherPtr private_error_pub_[kMaxSourceLidar];
+  PublisherPtr global_error_pub_;
   PublisherPtr private_non_return_rays_pub_[kMaxSourceLidar];
   PublisherPtr global_non_return_rays_pub_;
+  DiagnosticUpdaterFinalPtr diagnostic_updaters_[kMaxSourceLidar];
   rosbag::Bag *bag_;
 
 #elif defined BUILDING_ROS2

@@ -25,6 +25,7 @@
 #include "lddc.h"
 #include "comm/comm.h"
 #include "comm/ldq.h"
+#include "comm/diagnostics_codes_table.h"
 
 #include <inttypes.h>
 #include <iostream>
@@ -36,11 +37,14 @@
 #include "livox_ros_driver2/livox_ros_types.h"
 #include "livox_ros_driver2/ros_headers.h"
 
-
 #include "driver_node.h"
 #include "lds_lidar.h"
 
 #include <pcl_conversions/pcl_conversions.h>
+
+#include <enway_msgs/ErrorArray.h>
+#include <enway_msgs/ErrorGeneric.h>
+
 namespace livox_ros
 {
 
@@ -64,9 +68,12 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   lds_ = nullptr;
   memset(private_pub_, 0, sizeof(private_pub_));
   memset(private_imu_pub_, 0, sizeof(private_imu_pub_));
+  memset(private_error_pub_, 0, sizeof(private_error_pub_));
   memset(private_non_return_rays_pub_, 0, sizeof(private_non_return_rays_pub_));
+  memset(diagnostic_updaters_, 0, sizeof(diagnostic_updaters_));
   global_pub_ = nullptr;
   global_imu_pub_ = nullptr;
+  global_error_pub_ = nullptr;
   global_non_return_rays_pub_ = nullptr;
   cur_node_ = nullptr;
   bag_ = nullptr;
@@ -114,6 +121,14 @@ Lddc::~Lddc() {
   if (global_imu_pub_) {
     delete global_imu_pub_;
   }
+
+  if (global_error_pub_) {
+    delete global_error_pub_;
+  }
+
+  if (global_non_return_rays_pub_) {
+    delete global_non_return_rays_pub_;
+  }
 #endif
 
   PrepareExit();
@@ -128,6 +143,15 @@ Lddc::~Lddc() {
   for (uint32_t i = 0; i < kMaxSourceLidar; i++) {
     if (private_imu_pub_[i]) {
       delete private_imu_pub_[i];
+    }
+    if (private_error_pub_[i]) {
+      delete private_error_pub_[i];
+    }
+    if (private_non_return_rays_pub_[i]) {
+      delete private_non_return_rays_pub_[i];
+    }
+    if (diagnostic_updaters_[i]) {
+      delete diagnostic_updaters_[i];
     }
   }
 #endif
@@ -184,6 +208,28 @@ void Lddc::DistributeImuData(void) {
   }
 }
 
+void Lddc::DistributeStateInfoData(void) {
+  if (!lds_) {
+    DRIVER_ERROR(*cur_node_, "lds is not registered");
+    return;
+  }
+  if (lds_->IsRequestExit()) {
+    DRIVER_ERROR(*cur_node_, "DistributeStateInfoData is RequestExit");
+    return;
+  }
+
+  lds_->state_info_semaphore_.Wait();
+  for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
+    uint32_t lidar_id = i;
+    LidarDevice *lidar = &lds_->lidars_[lidar_id];
+    LidarStateInfoQueue *state_info_data_queue = &lidar->state_info_data_queue;
+    if ((kConnectStateSampling != lidar->connect_state) || (state_info_data_queue == nullptr)) {
+      continue;
+    }
+    PollingLidarStateInfoData(lidar_id, lidar);
+  }
+}
+
 void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
   LidarDataQueue *p_queue = &lidar->data;
   if (p_queue == nullptr || p_queue->storage_packet == nullptr) {
@@ -205,6 +251,13 @@ void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
     PublishImuData(p_queue, index, lidar->livox_config.frame_id);
+  }
+}
+
+void Lddc::PollingLidarStateInfoData(uint8_t index, LidarDevice *lidar) {
+  LidarStateInfoQueue& p_queue = lidar->state_info_data_queue;
+  while (!lds_->IsRequestExit() && !p_queue.Empty()) {
+    PublishStateInfoData(p_queue, index, lidar->livox_config.frame_id);
   }
 }
 
@@ -773,6 +826,80 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
   }
 }
 
+void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, const uint8_t index, const std::string& lidar_frame_id) {
+  StateInfoData state_info_data;
+  if (!state_info_data_queue.Pop(state_info_data)) {
+    return;
+  }
+
+  // There is a lot of information in the StateInfoData, including a lot of lidar configuration data
+  // For now, we are only interested in the error codes, but this method can be extended to handle other info
+  if (!state_info_data.info.HasMember("hms_code"))
+  {
+    return;
+  }
+
+  const rapidjson::Value& hms_codes = state_info_data.info["hms_code"]; // Using a reference for consecutive access is handy and faster.
+  if (!hms_codes.IsArray())
+  {
+    return;
+  }
+
+  uint64_t timestamp = state_info_data.time_stamp;
+
+  enway_msgs::ErrorArray errors_array_msg;
+  #ifdef BUILDING_ROS1
+    PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
+    errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0);
+  #elif defined BUILDING_ROS2
+    throw std::logic_error("Function not implemented for ROS2, since enway_msgs::ErrorCodeGeneric is not implemented");
+  #endif
+
+  for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
+  {
+    uint32_t hms_code = hms_codes[i].GetUint();
+    if (hms_code == 0)  // 0 means no error
+    {
+      continue;
+    }
+
+    // HMS code format: 4 Bytes: hms_bytes[3:2] = error code/ID, hms_bytes[1] = Reserved, hms_bytes[0] = severity level
+    // source: https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html
+    enway_msgs::ErrorGeneric error_msg;
+    error_msg.header = errors_array_msg.header;
+    uint8_t error_level = hms_code & 0x000000ff;
+    error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity
+
+    uint16_t error_code = (hms_code & 0xffff0000) >> 16;
+    error_msg.error_code = error_code;
+
+    auto error_desc_iter = livox_ros::error_code_to_description_mapping.find(error_code);
+    if (error_desc_iter == livox_ros::error_code_to_description_mapping.end())
+    {
+      error_msg.description = "Unknown Error Code";
+      error_msg.suggested_solution = "Unknown Error Code";
+    }
+    else
+    {
+      ErrorDescription error_desc = error_desc_iter->second;
+      error_msg.description = error_desc.description;
+      error_msg.suggested_solution = error_desc.suggested_solution;
+    }
+
+    errors_array_msg.errors.push_back(error_msg);
+  }
+
+  // keep the last errors array in the LidarDevice struct, so it can be used by the diagnostics updater
+  lds_->lidars_[index].last_errors_array = errors_array_msg;
+
+  if (kOutputToRos == output_type_) {
+    publisher_ptr->publish(errors_array_msg);
+    GetCurrentDiagnosticUpdater(index)->update(); // produce and publish diagnostics (rate-limited)
+  } else {
+    // Do not support bagging error messages
+  }
+}
+
 #ifdef BUILDING_ROS2
 std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
     std::string &topic_name, uint32_t queue_size) {
@@ -889,6 +1016,39 @@ PublisherPtr Lddc::GetCurrentImuPublisher(uint8_t handle) {
   return *pub;
 }
 
+PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
+  ros::Publisher **pub = nullptr;
+  uint32_t queue_size = kMinEthPacketQueueSize;
+
+  if (use_multi_topic_) {
+    pub = &private_error_pub_[handle];
+    queue_size = queue_size * 2; // queue size is 64 for only one lidar
+  } else {
+    pub = &global_error_pub_;
+    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+  }
+
+  if (*pub == nullptr) {
+    char name_str[48];
+    memset(name_str, 0, sizeof(name_str));
+    if (use_multi_topic_) {
+      DRIVER_INFO(*cur_node_, "Support multi topics.");
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/errors_%s", ReplacePeriodByUnderline(ip_string).c_str());
+    } else {
+      DRIVER_INFO(*cur_node_, "Support only one topic.");
+      snprintf(name_str, sizeof(name_str), "livox/errors");
+    }
+
+    *pub = new ros::Publisher;
+    **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorArray>(name_str, queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
+             queue_size);
+  }
+
+  return *pub;
+}
+
 PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
   ros::Publisher **pub = nullptr;
   uint32_t queue_size = kMinEthPacketQueueSize;
@@ -921,6 +1081,71 @@ PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
   }
 
   return *pub;
+}
+
+DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
+  // always use multiple diagnostic updaters, so we can call the right diagnostics task
+  DiagnosticUpdaterFinal** updater = &diagnostic_updaters_[index];
+
+  if (*updater == nullptr) {
+    std::string ip_string = ReplacePeriodByUnderline(IpNumToString(lds_->lidars_[index].handle));
+
+    if (!use_multi_topic_) {
+      DRIVER_WARN(*cur_node_, "Diagnostics publisher only support multi");
+    }
+    // init a new diagnostic updater
+    *updater = new DiagnosticUpdaterFinal;
+    (*updater)->setHardwareID("livox_driver_" + ip_string);
+
+    std::string task_name = "livox_" + ip_string;
+    (*updater)->add(task_name, [this, index](diagnostic_updater::DiagnosticStatusWrapper& status) {
+      produceDiagnostics(status, index);
+    });
+
+    DRIVER_INFO(*cur_node_,
+                "Publish diagnostics for lidar with IP %s, diagnostics hardware_id: %s",
+                ip_string.c_str(),
+                ("livox_driver_" + ip_string).c_str());
+  }
+
+  return *updater;
+}
+
+void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index) {
+  enway_msgs::ErrorArray errors = lds_->lidars_[index].last_errors_array;
+
+  stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
+
+  int i = 0;
+  for (const enway_msgs::ErrorGeneric& error : errors.errors)
+  {
+    std::stringstream stream;
+    stream << error.description << " - " << error.suggested_solution << " (error code: 0x" << std::hex
+           << error.error_code << ")";
+    std::string msg(stream.str());
+
+    switch (error.severity)
+    {
+    case enway_msgs::ErrorGeneric::Info:
+      break;
+
+    case enway_msgs::ErrorGeneric::Warning:
+      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::WARN, msg);
+      stat.add("Warning " + std::to_string(i), msg);
+      break;
+
+    case enway_msgs::ErrorGeneric::Error:
+    case enway_msgs::ErrorGeneric::Fatal:
+      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::ERROR, msg);
+      stat.add("Error " + std::to_string(i), msg);
+      break;
+
+    default:
+      DRIVER_WARN(*cur_node_, "Ignoring unknown error severity: %d", (int)error.severity);
+      break;
+    }
+    i++;
+  }
 }
 
 #elif defined BUILDING_ROS2

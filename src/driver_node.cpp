@@ -39,6 +39,7 @@ DriverNode::~DriverNode() {
     thread->join();
   }
   imudata_poll_thread_->join();
+  state_info_data_poll_thread_->join();
 }
 
 } // namespace livox_ros

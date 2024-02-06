@@ -58,7 +58,7 @@ bool ParseCfgFile::ParseSummaryInfo(LidarSummaryInfo& lidar_summary_info) {
     return true;
   } while (false);
 
-  std::cout << "parse lidar type failed." << std::endl;
+  std::cout << "ParseSummaryInfo: parse lidar type failed. from path: " << path_ << std::endl;
   std::fclose(raw_file);
   return false;
 }

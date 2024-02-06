@@ -37,6 +37,8 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   pcl_ros
   dust_filter_livox
+  diagnostic_updater
+  enway_msgs
   nodelet
   pcl_conversions
 )
@@ -142,6 +144,7 @@ target_sources(${PROJECT_NAME}_node
   src/comm/ldq.cpp
   src/comm/semaphore.cpp
   src/comm/lidar_imu_data_queue.cpp
+  src/comm/lidar_state_info_queue.cpp
   src/comm/cache_index.cpp
   src/comm/pub_handler.cpp
 
@@ -164,6 +167,7 @@ target_sources(${PROJECT_NAME}_nodelet
   src/comm/ldq.cpp
   src/comm/semaphore.cpp
   src/comm/lidar_imu_data_queue.cpp
+  src/comm/lidar_state_info_queue.cpp
   src/comm/cache_index.cpp
   src/comm/pub_handler.cpp
 

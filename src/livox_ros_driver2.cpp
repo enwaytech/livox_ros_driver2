@@ -123,6 +123,8 @@ int main(int argc, char **argv) {
   }
 
   livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
+  livox_node.state_info_data_poll_thread_ = std::make_shared<std::thread>(&DriverNode::StateInfoDataPollThread, &livox_node);
+  
   while (ros::ok()) { usleep(10000); }
 
   return 0;
@@ -198,6 +200,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
   }
   pointclouddata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PointCloudDataPollThread, this);
   imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, this);
+  state_info_data_poll_thread_ = std::make_shared<std::thread>(&DriverNode::StateInfoDataPollThread, this);
 }
 
 }  // namespace livox_ros
@@ -228,23 +231,11 @@ void DriverNode::ImuDataPollThread()
   } while (status == std::future_status::timeout);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void DriverNode::StateInfoDataPollThread()
+{
+  std::future_status status;
+  do {
+    lddc_ptr_->DistributeStateInfoData();
+    status = future_.wait_for(std::chrono::microseconds(0));
+  } while (status == std::future_status::timeout);
+}
