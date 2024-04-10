@@ -33,7 +33,7 @@
 #include <optional>
 #include <string>
 
-#include <diagnostic_updater/diagnostic_updater.h>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 
 #include <dust_filter_livox/dust_filter.h>
 
@@ -62,11 +62,7 @@ using PointField = sensor_msgs::PointField;
 using CustomMsg = livox_ros_driver2::CustomMsg;
 using CustomPoint = livox_ros_driver2::CustomPoint;
 using ImuMsg = sensor_msgs::Imu;
-
-// Suppress `delete-non-virtual-dtor` warning by using final class, as diagnostic_updater::Updater does not have a virtual
-// destructor and is not marked as final. Otherwise calling delete Updater* generates a compilation warning.
-struct DiagnosticUpdaterFinal final : diagnostic_updater::Updater {}; //
-using DiagnosticUpdaterFinalPtr = DiagnosticUpdaterFinal*;
+using ErrorGeneric = enway_msgs::ErrorGeneric;
 #elif defined BUILDING_ROS2
 template <typename MessageT> using Publisher = rclcpp::Publisher<MessageT>;
 using PublisherPtr = std::shared_ptr<rclcpp::PublisherBase>;
@@ -75,7 +71,13 @@ using PointField = sensor_msgs::msg::PointField;
 using CustomMsg = livox_ros_driver2::msg::CustomMsg;
 using CustomPoint = livox_ros_driver2::msg::CustomPoint;
 using ImuMsg = sensor_msgs::msg::Imu;
+using ErrorGeneric = enway_msgs::msg::ErrorGeneric;
 #endif
+
+// Suppress `delete-non-virtual-dtor` warning by using final class, as diagnostic_updater::Updater does not have a virtual
+// destructor and is not marked as final. Otherwise calling delete Updater* generates a compilation warning.
+struct DiagnosticUpdaterFinal : diagnostic_updater::Updater {}; //
+using DiagnosticUpdaterFinalPtr = DiagnosticUpdaterFinal*;
 
 using PointCloud = pcl::PointCloud<pcl::PointXYZI>;
 
@@ -88,8 +90,9 @@ class Lddc final {
        const std::vector<double>& angular_velocity_covariance,
        const std::vector<double>& linear_acceleration_covariance, bool lidar_bag, bool imu_bag, bool dust_filter, bool pub_non_return_rays);
 #elif defined BUILDING_ROS2
-  Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-      std::string &frame_id);
+  Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
+       const std::vector<double>& angular_velocity_covariance,
+       const std::vector<double>& linear_acceleration_covariance, bool dust_filter);
 #endif
   ~Lddc();
 
@@ -183,10 +186,17 @@ class Lddc final {
   rosbag::Bag *bag_;
 
 #elif defined BUILDING_ROS2
+  bool pub_non_return_rays_;
+  std::optional<std::vector<dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtlt>>> dust_filters_;
   PublisherPtr private_pub_[kMaxSourceLidar];
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
+  PublisherPtr private_error_pub_[kMaxSourceLidar];
+  PublisherPtr global_error_pub_;
+  PublisherPtr private_non_return_rays_pub_[kMaxSourceLidar];
+  PublisherPtr global_non_return_rays_pub_;
+  DiagnosticUpdaterFinalPtr diagnostic_updaters_[kMaxSourceLidar];
 #endif
 
   livox_ros::DriverNode *cur_node_;

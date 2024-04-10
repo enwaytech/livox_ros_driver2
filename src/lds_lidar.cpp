@@ -149,9 +149,6 @@ bool LdsLidar::InitLivoxLidar() {
     return false;
   }
 
-  tf2_ros::Buffer buffer_;
-  tf2_ros::TransformListener listener_{buffer_};
-
   // fill in lidar devices
   for (auto& config : user_configs) {
     uint8_t index = 0;
@@ -269,9 +266,9 @@ void LdsLidar::PrepareExit(void) { DeInitLdsLidar(); }
 
 std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const std::string target_frame, const std::string source_frame)
 {
+#ifdef BUILDING_ROS1
   tf2_ros::Buffer buffer_;
   tf2_ros::TransformListener listener_{buffer_};
-
   constexpr double transform_timeout {1.0};
   if(!buffer_.canTransform(target_frame, source_frame, ros::Time(0), ros::Duration(transform_timeout)))
   {
@@ -292,5 +289,8 @@ std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const
   double roll, pitch, yaw;
   tf2::getEulerYPR(transform.transform.rotation, yaw, pitch, roll);
   return std::tuple(static_cast<float>(roll), static_cast<float>(pitch), static_cast<float>(yaw));
+#elif defined BUILDING_ROS2
+  return std::tuple(static_cast<float>(0.0), static_cast<float>(0.0), static_cast<float>(0.0));
+#endif
 }
 }  // namespace livox_ros

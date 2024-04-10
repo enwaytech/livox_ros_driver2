@@ -33,6 +33,7 @@ namespace livox_ros {
 void LivoxLidarCallback::LidarInfoChangeCallback(const uint32_t handle,
                                            const LivoxLidarInfo* info,
                                            void* client_data) {
+  std::cout << "LidarInfoChangeCallback" << std::endl;
   if (client_data == nullptr) {
     std::cout << "lidar info change callback failed, client data is nullptr" << std::endl;
     return;
@@ -112,6 +113,7 @@ void LivoxLidarCallback::WorkModeChangedCallback(livox_status status,
                                                  uint32_t handle,
                                                  LivoxLidarAsyncControlResponse *response,
                                                  void *client_data) {
+  std::cout << "WorkModeChangedCallback" << std::endl;
   if (status != kLivoxLidarStatusSuccess) {
     std::cout << "failed to change work mode, handle: " << handle << ", try again..."<< std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -125,6 +127,7 @@ void LivoxLidarCallback::WorkModeChangedCallback(livox_status status,
 void LivoxLidarCallback::SetDataTypeCallback(livox_status status, uint32_t handle,
                                              LivoxLidarAsyncControlResponse *response,
                                              void *client_data) {
+  std::cout << "SetDataTypeCallback" << std::endl;
   LidarDevice* lidar_device =  GetLidarDevice(handle, client_data);
   if (lidar_device == nullptr) {
     std::cout << "failed to set data type since no lidar device found, handle: "
@@ -158,6 +161,7 @@ void LivoxLidarCallback::SetDataTypeCallback(livox_status status, uint32_t handl
 void LivoxLidarCallback::SetPatternModeCallback(livox_status status, uint32_t handle,
                                                 LivoxLidarAsyncControlResponse *response,
                                                 void *client_data) {
+  std::cout << "SetPatternModeCallback" << std::endl;
   LidarDevice* lidar_device =  GetLidarDevice(handle, client_data);
   if (lidar_device == nullptr) {
     std::cout << "failed to set pattern mode since no lidar device found, handle: "

@@ -11,13 +11,13 @@
       "log_data_port": 56500
     },
     "host_net_info" : {
-      "cmd_data_ip" : "192.168.1.50",
+      "cmd_data_ip" : "192.168.1.112",
       "cmd_data_port": 56101,
-      "push_msg_ip": "192.168.1.50",
+      "push_msg_ip": "192.168.1.112",
       "push_msg_port": 56201,
-      "point_data_ip": "192.168.1.50",
+      "point_data_ip": "192.168.1.112",
       "point_data_port": 56301,
-      "imu_data_ip" : "192.168.1.50",
+      "imu_data_ip" : "192.168.1.112",
       "imu_data_port": 56401,
       "log_data_ip" : "",
       "log_data_port": 56501
@@ -25,7 +25,7 @@
   },
   "lidar_configs" : [
     {
-      "ip" : "192.168.1.111",
+      "ip" : "192.168.1.11",
       "pcl_data_type" : 1,
       "pattern_mode" : 0,
       "frame_id" : "livox_frame",
@@ -36,6 +36,23 @@
         "x": 0,
         "y": 0,
         "z": 0
+      },
+      "enable_yaw_filter" : true,
+      "filter_parameter": {
+        "filter_frame_id": "base_link_back",
+        "filter_yaw_start": 265.0,
+        "filter_yaw_end": 95.0
+      },
+      "enable_rays_filter" : true,
+      "filter_rays_parameter": {
+        "filter_rays_frame_id": "base_link_back",
+        "filter_rays_yaw_start": 260.0,
+        "filter_rays_yaw_end": 100.0,
+        "filter_rays_pitch_start": 0.0,
+        "filter_rays_pitch_end": 90.0,
+        "filter_rays_local_theta": true,
+        "filter_rays_local_theta_start": 89.0,
+        "filter_rays_local_theta_end": 104.0
       }
     }
   ]

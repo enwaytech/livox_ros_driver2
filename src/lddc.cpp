@@ -42,8 +42,8 @@
 
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <enway_msgs/ErrorArray.h>
-#include <enway_msgs/ErrorGeneric.h>
+#include <enway_msgs/msg/error_array.hpp>
+#include <enway_msgs/msg/error_generic.hpp>
 
 namespace livox_ros
 {
@@ -96,19 +96,45 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   }
 }
 #elif defined BUILDING_ROS2
-Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string& frame_id)
+Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string& frame_id, 
+           const std::vector<double>& angular_velocity_covariance,
+           const std::vector<double>& linear_acceleration_covariance, bool dust_filter)
   : transfer_format_(format)
   , use_multi_topic_(multi_topic)
   , data_src_(data_src)
   , output_type_(output_type)
   , publish_frq_(frq)
   , frame_id_(frame_id)
+  , angular_velocity_covariance_(angular_velocity_covariance)
+  , linear_acceleration_covariance_(linear_acceleration_covariance)
 {
+  std::cout << "Transfer format: " << format << std::endl;
   publish_period_ns_ = kNsPerSecond / publish_frq_;
   lds_ = nullptr;
 #if 0
   bag_ = nullptr;
 #endif
+  memset(diagnostic_updaters_, 0, sizeof(diagnostic_updaters_));
+  if (dust_filter)
+  {
+    if (transfer_format_ == kPointCloud2Msg || transfer_format_ == kPclPxyziMsg)
+    {
+      std::cout << "Dustfilter is enabled" << std::endl;
+      dust_filters_.emplace();
+      for (size_t i = 0; i < kMaxSourceLidar; i++)
+      {
+        dust_filters_->push_back(dust_filter_livox::DustFilter<livox_ros::PCLLivoxPointXyzrtlt>{});
+      }
+    }
+    else
+    {
+      throw std::runtime_error("Dustfilter is not supported with the selected xfer_format.");
+    }
+  }
+  else
+  {
+    std::cout << "Dustfilter is disabled" << std::endl;
+  }
 }
 #endif
 
@@ -285,7 +311,7 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       continue;
     }
 
-    sensor_msgs::PointCloud2 cloud;
+    PointCloud2 cloud;
     uint64_t timestamp = 0;
 
     // Apply enway dust filtering
@@ -322,7 +348,12 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       {
         timestamp = pkg.base_time;
       }
-      cloud.header.stamp = ros::Time(timestamp / 1000000000.0);
+  #ifdef BUILDING_ROS1
+      cloud.header.stamp = ros::Time( timestamp / 1000000000.0);
+  #elif defined BUILDING_ROS2
+      cloud.header.stamp = rclcpp::Time(timestamp);
+  #endif
+
 
       std::vector<LivoxPointXyzrtlt> points;
       points.reserve(dust_filtered_cloud.points.size());
@@ -351,7 +382,7 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
 
     if (pub_non_return_rays_)
     {
-      sensor_msgs::PointCloud2 non_return_rays_cloud;
+      PointCloud2 non_return_rays_cloud;
       InitPointcloud2NonReturnRaysMsg(pkg, non_return_rays_cloud, timestamp, frame_id);
       PublishPointcloud2NonReturnRaysData(index, timestamp, non_return_rays_cloud);
     }
@@ -773,18 +804,15 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
 #elif defined BUILDING_ROS2
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
-
   // set angular velocity to data received from the IMU [in rad/s]
   imu_msg.angular_velocity.x = imu_data.gyro_x;
   imu_msg.angular_velocity.y = imu_data.gyro_y;
   imu_msg.angular_velocity.z = imu_data.gyro_z;
-
   // convert the linear acceleration from g's to m/s^2, following the ROS message specifications
   constexpr float g_to_ms2 = 9.80665;
   imu_msg.linear_acceleration.x = imu_data.acc_x * g_to_ms2;
   imu_msg.linear_acceleration.y = imu_data.acc_y * g_to_ms2;
   imu_msg.linear_acceleration.z = imu_data.acc_z * g_to_ms2;
-
   // set covariances from config for angular_velocity and linear_acceleration, and reset orientation_covariance
   for(int i = 0; i < 9; i++)
   {
@@ -792,13 +820,13 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
     imu_msg.linear_acceleration_covariance[i] = linear_acceleration_covariance_[i];
     imu_msg.orientation_covariance[i] = 0;
   }
-
   // IMU does not provide orientation data, so leave imu_msg.orientation with all 0 and set element 0 of the associated
   // covariance matrix to -1 (following the ROS message specifications)
   imu_msg.orientation_covariance[0] = -1;
 }
 
 void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id) {
+
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -808,7 +836,6 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
   ImuMsg imu_msg;
   uint64_t timestamp;
   InitImuMsg(imu_data, imu_msg, timestamp, lidar_frame_id);
-
 #ifdef BUILDING_ROS1
   PublisherPtr publisher_ptr = GetCurrentImuPublisher(index);
 #elif defined BUILDING_ROS2
@@ -847,12 +874,14 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
   uint64_t timestamp = state_info_data.time_stamp;
 
-  enway_msgs::ErrorArray errors_array_msg;
+  enway_msgs::msg::ErrorArray errors_array_msg;
   #ifdef BUILDING_ROS1
     PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
     errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0);
   #elif defined BUILDING_ROS2
-    throw std::logic_error("Function not implemented for ROS2, since enway_msgs::ErrorCodeGeneric is not implemented");
+    // TODO GEORG
+  //Publisher<PointCloud2>::SharedPtr publisher_ptr =
+  //  std::dynamic_pointer_cast<Publisher<PointCloud2>>(GetCurrentErrorPublisher(index));
   #endif
 
   for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
@@ -865,7 +894,12 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
     // HMS code format: 4 Bytes: hms_bytes[3:2] = error code/ID, hms_bytes[1] = Reserved, hms_bytes[0] = severity level
     // source: https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html
-    enway_msgs::ErrorGeneric error_msg;
+  #ifdef BUILDING_ROS1
+      enway_msgs::ErrorGeneric error_msg;
+  #elif defined BUILDING_ROS2
+      enway_msgs::msg::ErrorGeneric error_msg;
+  #endif
+    
     error_msg.header = errors_array_msg.header;
     uint8_t error_level = hms_code & 0x000000ff;
     error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity
@@ -893,8 +927,8 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   lds_->lidars_[index].last_errors_array = errors_array_msg;
 
   if (kOutputToRos == output_type_) {
-    publisher_ptr->publish(errors_array_msg);
-    GetCurrentDiagnosticUpdater(index)->update(); // produce and publish diagnostics (rate-limited)
+    //publisher_ptr->publish(errors_array_msg);
+    //GetCurrentDiagnosticUpdater(index)->update(); // TODO: GEORG produce and publish diagnostics (rate-limited)
   } else {
     // Do not support bagging error messages
   }
@@ -1112,7 +1146,7 @@ DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
 }
 
 void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index) {
-  enway_msgs::ErrorArray errors = lds_->lidars_[index].last_errors_array;
+  enway_msgs::msg::ErrorArray errors = lds_->lidars_[index].last_errors_array;
 
   stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
 
@@ -1198,6 +1232,111 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentImuPublisher(uint8_t hand
     return global_imu_pub_;
   }
 }
+
+PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
+#if 0
+  ros::Publisher **pub = nullptr;
+  uint32_t queue_size = kMinEthPacketQueueSize;
+
+  if (use_multi_topic_) {
+    pub = &private_error_pub_[handle];
+    queue_size = queue_size * 2; // queue size is 64 for only one lidar
+  } else {
+    pub = &global_error_pub_;
+    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+  }
+
+  if (*pub == nullptr) {
+    char name_str[48];
+    memset(name_str, 0, sizeof(name_str));
+    if (use_multi_topic_) {
+      DRIVER_INFO(*cur_node_, "Support multi topics.");
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/errors_%s", ReplacePeriodByUnderline(ip_string).c_str());
+    } else {
+      DRIVER_INFO(*cur_node_, "Support only one topic.");
+      snprintf(name_str, sizeof(name_str), "livox/errors");
+    }
+
+    *pub = new ros::Publisher;
+    **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorArray>(name_str, queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
+             queue_size);
+  }
+
+  return *pub;
+#endif
+}
+
+DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
+#if 0
+  // always use multiple diagnostic updaters, so we can call the right diagnostics task
+  DiagnosticUpdaterFinal** updater = &diagnostic_updaters_[index];
+
+  if (*updater == nullptr) {
+    std::string ip_string = ReplacePeriodByUnderline(IpNumToString(lds_->lidars_[index].handle));
+
+    if (!use_multi_topic_) {
+      DRIVER_WARN(*cur_node_, "Diagnostics publisher only support multi");
+    }
+    // init a new diagnostic updater
+    *updater = new DiagnosticUpdaterFinal;
+    (*updater)->setHardwareID("livox_driver_" + ip_string);
+
+    std::string task_name = "livox_" + ip_string;
+    (*updater)->add(task_name, [this, index](diagnostic_updater::DiagnosticStatusWrapper& status) {
+      produceDiagnostics(status, index);
+    });
+
+    DRIVER_INFO(*cur_node_,
+                "Publish diagnostics for lidar with IP %s, diagnostics hardware_id: %s",
+                ip_string.c_str(),
+                ("livox_driver_" + ip_string).c_str());
+  }
+
+  return *updater;
+#endif
+}
+
+void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index) {
+#if 0
+  ErrorGeneric errors = lds_->lidars_[index].last_errors_array;
+
+  stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
+
+  int i = 0;
+  for (const ErrorGeneric& error : errors.errors)
+  {
+    std::stringstream stream;
+    stream << error.description << " - " << error.suggested_solution << " (error code: 0x" << std::hex
+           << error.error_code << ")";
+    std::string msg(stream.str());
+
+    switch (error.severity)
+    {
+    case ErrorGeneric::Info:
+      break;
+
+    case ErrorGeneric::Warning:
+      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::WARN, msg);
+      stat.add("Warning " + std::to_string(i), msg);
+      break;
+
+    case ErrorGeneric::Error:
+    case ErrorGeneric::Fatal:
+      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::ERROR, msg);
+      stat.add("Error " + std::to_string(i), msg);
+      break;
+
+    default:
+      DRIVER_WARN(*cur_node_, "Ignoring unknown error severity: %d", (int)error.severity);
+      break;
+    }
+    i++;
+  }
+#endif
+}
+
 #endif
 
 void Lddc::CreateBagFile(const std::string &file_name) {
