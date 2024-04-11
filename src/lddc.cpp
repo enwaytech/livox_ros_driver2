@@ -336,7 +336,11 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index, const std::s
       }
 
       // Get result cloud without dust
+#ifdef BUILDING_ROS1
       pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtlt> dust_filtered_cloud = dust_filter.getFilteredPointCloud();
+#elif defined BUILDING_ROS2
+      pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtlt> dust_filtered_cloud = dust_filter.getFilteredPointCloud(cur_node_->get_logger());
+#endif
       // Assemble PointCloud2
       cloud.width = dust_filtered_cloud.points.size();
       cloud.row_step = cloud.width * cloud.point_step;
@@ -452,7 +456,12 @@ void Lddc::PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string
       }
 
       // Get result cloud without dust
+#ifdef BUILDING_ROS1
       pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtlt> dust_filtered_cloud = dust_filter.getFilteredPointCloud();
+#elif defined BUILDING_ROS2
+      pcl::PointCloud<livox_ros::PCLLivoxPointXyzrtlt> dust_filtered_cloud = dust_filter.getFilteredPointCloud(cur_node_->get_logger());
+#endif
+
       cloud.width = dust_filtered_cloud.points.size();
       for (size_t i = 0; i < dust_filtered_cloud.points.size(); ++i)
       {
