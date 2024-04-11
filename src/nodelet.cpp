@@ -99,7 +99,8 @@ livox_ros::Nodelet::onInit()
 
     Lds* lds = static_cast<Lds *>(read_lidar);
     livox_node_->lddc_ptr_->RegisterLds(lds);
-    if ((read_lidar->InitLdsLidar(user_config_path))) {
+    auto ros_clock = livox_node_->get_clock();
+    if (read_lidar->InitLdsLidar(user_config_path)) {
       DRIVER_INFO(livox_node_, "Init lds lidar successfully!");
     } else {
       DRIVER_ERROR(livox_node_, "Init lds lidar failed!");

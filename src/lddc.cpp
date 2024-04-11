@@ -874,15 +874,15 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
   uint64_t timestamp = state_info_data.time_stamp;
 
-  enway_msgs::msg::ErrorArray errors_array_msg;
-  #ifdef BUILDING_ROS1
-    PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
-    errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0);
-  #elif defined BUILDING_ROS2
-    // TODO GEORG
-  //Publisher<PointCloud2>::SharedPtr publisher_ptr =
-  //  std::dynamic_pointer_cast<Publisher<PointCloud2>>(GetCurrentErrorPublisher(index));
-  #endif
+  ErrorArrayMsg errors_array_msg;
+#ifdef BUILDING_ROS1
+  PublisherPtr publisher_ptr = Lddc::GetCurrentErrorPublisher(index);
+  errors_array_msg.header.stamp = ros::Time(timestamp / 1000000000.0);
+#elif defined BUILDING_ROS2
+  errors_array_msg.header.stamp = rclcpp::Time(timestamp);
+  Publisher<ErrorArrayMsg>::SharedPtr publisher_ptr =
+    std::dynamic_pointer_cast<Publisher<ErrorArrayMsg>>(GetCurrentErrorPublisher(index));
+#endif
 
   for (rapidjson::SizeType i = 0; i < hms_codes.Size(); i++) // Uses SizeType instead of size_t
   {
@@ -894,12 +894,7 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
 
     // HMS code format: 4 Bytes: hms_bytes[3:2] = error code/ID, hms_bytes[1] = Reserved, hms_bytes[0] = severity level
     // source: https://livox-wiki-en.readthedocs.io/en/latest/tutorials/new_product/mid360/hms_code_mid360.html
-  #ifdef BUILDING_ROS1
-      enway_msgs::ErrorGeneric error_msg;
-  #elif defined BUILDING_ROS2
-      enway_msgs::msg::ErrorGeneric error_msg;
-  #endif
-    
+    ErrorGeneric error_msg;
     error_msg.header = errors_array_msg.header;
     uint8_t error_level = hms_code & 0x000000ff;
     error_msg.severity = error_level - 1; // Convert Livox level to ErrorGeneric::severity
@@ -927,8 +922,12 @@ void Lddc::PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, cons
   lds_->lidars_[index].last_errors_array = errors_array_msg;
 
   if (kOutputToRos == output_type_) {
-    //publisher_ptr->publish(errors_array_msg);
-    //GetCurrentDiagnosticUpdater(index)->update(); // TODO: GEORG produce and publish diagnostics (rate-limited)
+    publisher_ptr->publish(errors_array_msg);
+#ifdef BUILDING_ROS1
+    GetCurrentDiagnosticUpdater(index)->update(); // produce and publish diagnostics (rate-limited)
+#elif defined BUILDING_ROS2
+    GetCurrentDiagnosticUpdater(index)->force_update(); // produce and publish diagnostics (rate-limited)
+#endif
   } else {
     // Do not support bagging error messages
   }
@@ -958,7 +957,14 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
           "%s publish use imu format", topic_name.c_str());
       return cur_node_->create_publisher<ImuMsg>(topic_name,
           queue_size);
-    } else {
+    }
+    else if (kErrorArrayMsg == msg_type)  {
+      DRIVER_INFO(*cur_node_,
+          "%s publish use error array format", topic_name.c_str());
+      return cur_node_->create_publisher<ErrorArrayMsg>(topic_name,
+          queue_size);
+    }
+     else {
       PublisherPtr null_publisher(nullptr);
       return null_publisher;
     }
@@ -1234,42 +1240,32 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentImuPublisher(uint8_t hand
 }
 
 PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
-#if 0
-  ros::Publisher **pub = nullptr;
+
   uint32_t queue_size = kMinEthPacketQueueSize;
-
   if (use_multi_topic_) {
-    pub = &private_error_pub_[handle];
-    queue_size = queue_size * 2; // queue size is 64 for only one lidar
-  } else {
-    pub = &global_error_pub_;
-    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
-  }
-
-  if (*pub == nullptr) {
-    char name_str[48];
-    memset(name_str, 0, sizeof(name_str));
-    if (use_multi_topic_) {
-      DRIVER_INFO(*cur_node_, "Support multi topics.");
+    if (!private_error_pub_[handle]) {
+      char name_str[48];
+      memset(name_str, 0, sizeof(name_str));
       std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
-      snprintf(name_str, sizeof(name_str), "livox/errors_%s", ReplacePeriodByUnderline(ip_string).c_str());
-    } else {
-      DRIVER_INFO(*cur_node_, "Support only one topic.");
-      snprintf(name_str, sizeof(name_str), "livox/errors");
+      snprintf(name_str, sizeof(name_str), "livox/errors_%s",
+          ReplacePeriodByUnderline(ip_string).c_str());
+      std::string topic_name(name_str);
+      queue_size = queue_size * 2; // queue size is 64 for only one lidar
+      private_error_pub_[handle] = CreatePublisher(kErrorArrayMsg, topic_name,
+          queue_size);
     }
-
-    *pub = new ros::Publisher;
-    **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorArray>(name_str, queue_size);
-    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
-             queue_size);
+    return private_error_pub_[handle];
+  } else {
+    if (!global_error_pub_) {
+      std::string topic_name("livox/errors");
+      queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+      global_error_pub_ = CreatePublisher(kErrorArrayMsg, topic_name, queue_size);
+    }
+    return global_error_pub_;
   }
-
-  return *pub;
-#endif
 }
 
 DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
-#if 0
   // always use multiple diagnostic updaters, so we can call the right diagnostics task
   DiagnosticUpdaterFinal** updater = &diagnostic_updaters_[index];
 
@@ -1280,7 +1276,7 @@ DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
       DRIVER_WARN(*cur_node_, "Diagnostics publisher only support multi");
     }
     // init a new diagnostic updater
-    *updater = new DiagnosticUpdaterFinal;
+    *updater = new DiagnosticUpdaterFinal(cur_node_);
     (*updater)->setHardwareID("livox_driver_" + ip_string);
 
     std::string task_name = "livox_" + ip_string;
@@ -1293,16 +1289,14 @@ DiagnosticUpdaterFinalPtr Lddc::GetCurrentDiagnosticUpdater(uint8_t index) {
                 ip_string.c_str(),
                 ("livox_driver_" + ip_string).c_str());
   }
-
   return *updater;
-#endif
 }
 
 void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat, uint8_t index) {
-#if 0
-  ErrorGeneric errors = lds_->lidars_[index].last_errors_array;
 
-  stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
+  enway_msgs::msg::ErrorArray errors = lds_->lidars_[index].last_errors_array;
+
+  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "OK");
 
   int i = 0;
   for (const ErrorGeneric& error : errors.errors)
@@ -1314,17 +1308,17 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
 
     switch (error.severity)
     {
-    case ErrorGeneric::Info:
+    case ErrorGeneric::INFO:
       break;
 
-    case ErrorGeneric::Warning:
-      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::WARN, msg);
+    case ErrorGeneric::WARNING:
+      stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, msg);
       stat.add("Warning " + std::to_string(i), msg);
       break;
 
-    case ErrorGeneric::Error:
-    case ErrorGeneric::Fatal:
-      stat.mergeSummary(diagnostic_msgs::DiagnosticStatus::ERROR, msg);
+    case ErrorGeneric::ERROR:
+    case ErrorGeneric::FATAL:
+      stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, msg);
       stat.add("Error " + std::to_string(i), msg);
       break;
 
@@ -1334,7 +1328,6 @@ void Lddc::produceDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat,
     }
     i++;
   }
-#endif
 }
 
 #endif

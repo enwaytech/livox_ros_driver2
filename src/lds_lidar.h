@@ -40,6 +40,8 @@
 
 #include "rapidjson/document.h"
 
+#include <rclcpp/rclcpp.hpp>
+
 namespace livox_ros {
 
 class LdsLidar final : public Lds {
@@ -50,7 +52,11 @@ class LdsLidar final : public Lds {
     return &lds_lidar;
   }
 
+#ifdef BUILDING_ROS1
   bool InitLdsLidar(const std::string& path_name);
+#elif defined BUILDING_ROS2
+  bool InitLdsLidar(const std::string& path_name, rclcpp::Clock::SharedPtr ros_clock);
+#endif
   bool Start();
 
   int DeInitLdsLidar(void);
@@ -61,9 +67,15 @@ class LdsLidar final : public Lds {
   LdsLidar &operator=(const LdsLidar &) = delete;
 
   bool ParseSummaryConfig();
-
+#ifdef BUILDING_ROS1
   bool InitLidars();
-  bool InitLivoxLidar();    // for new SDK
+  bool InitLivoxLidar();
+#elif defined BUILDING_ROS2
+  bool InitLidars(rclcpp::Clock::SharedPtr ros_clock);
+  bool InitLivoxLidar(rclcpp::Clock::SharedPtr ros_clock);
+#endif
+
+    // for new SDK
 
   bool LivoxLidarStart();
 
@@ -77,7 +89,7 @@ class LdsLidar final : public Lds {
   bool IsAutoConnectMode(void) { return auto_connect_mode_; }
 
   virtual void PrepareExit(void);
-  std::optional<std::tuple<float, float, float>> GetTransformation(const std::string target_frame, const std::string source_frame);
+  std::optional<std::tuple<float, float, float>> GetTransformation(const std::string target_frame, const std::string source_frame, rclcpp::Clock::SharedPtr ros_clock);
 
  public:
   std::mutex config_mutex_;

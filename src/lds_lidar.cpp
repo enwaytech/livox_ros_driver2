@@ -52,6 +52,9 @@
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#ifdef BUILDING_ROS2
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#endif
 #include <tf2/utils.h>
 
 using namespace std;
@@ -79,8 +82,11 @@ LdsLidar::~LdsLidar() {}
 void LdsLidar::ResetLdsLidar(void) { ResetLds(kSourceRawLidar); }
 
 
-
+#ifdef BUILDING_ROS1
 bool LdsLidar::InitLdsLidar(const std::string& path_name) {
+#elif defined BUILDING_ROS2
+bool LdsLidar::InitLdsLidar(const std::string& path_name, rclcpp::Clock::SharedPtr ros_clock) {
+#endif
   if (is_initialized_) {
     printf("Lds is already inited!\n");
     return false;
@@ -91,7 +97,11 @@ bool LdsLidar::InitLdsLidar(const std::string& path_name) {
   }
 
   path_ = path_name;
+#ifdef BUILDING_ROS1
   if (!InitLidars()) {
+#elif defined BUILDING_ROS2
+  if (!InitLidars(ros_clock)) {
+#endif
     return false;
   }
   SetLidarPubHandle();
@@ -102,14 +112,22 @@ bool LdsLidar::InitLdsLidar(const std::string& path_name) {
   return true;
 }
 
+#ifdef BUILDING_ROS1
 bool LdsLidar::InitLidars() {
+#elif defined BUILDING_ROS2
+bool LdsLidar::InitLidars(rclcpp::Clock::SharedPtr ros_clock) {
+#endif
   if (!ParseSummaryConfig()) {
     return false;
   }
   std::cout << "config lidar type: " << static_cast<int>(lidar_summary_info_.lidar_type) << std::endl;
 
   if (lidar_summary_info_.lidar_type & kLivoxLidarType) {
+#ifdef BUILDING_ROS1
     if (!InitLivoxLidar()) {
+#elif defined BUILDING_ROS2
+    if (!InitLivoxLidar(ros_clock)) {
+#endif
       return false;
     }
   }
@@ -130,7 +148,11 @@ bool LdsLidar::ParseSummaryConfig() {
   return ParseCfgFile(path_).ParseSummaryInfo(lidar_summary_info_);
 }
 
+#ifdef BUILDING_ROS1
 bool LdsLidar::InitLivoxLidar() {
+#elif defined BUILDING_ROS2
+bool LdsLidar::InitLivoxLidar(rclcpp::Clock::SharedPtr ros_clock) {
+#endif
 #ifdef BUILDING_ROS2
   DisableLivoxSdkConsoleLogger();
 #endif
@@ -192,7 +214,12 @@ bool LdsLidar::InitLivoxLidar() {
       filter_param.param.filter_yaw_start = config.filter_param.filter_yaw_start;
       filter_param.param.filter_yaw_end = config.filter_param.filter_yaw_end;
 
+#ifdef BUILDING_ROS1
       auto rotation = GetTransformation(config.filter_param.filter_frame_id, config.frame_id);
+#elif defined BUILDING_ROS2
+      auto rotation = GetTransformation(config.filter_param.filter_frame_id, config.frame_id, ros_clock);
+#endif
+
       if (rotation)
       {
         filter_param.transform.roll = std::get<0>(*rotation);
@@ -215,7 +242,13 @@ bool LdsLidar::InitLivoxLidar() {
       rays_param.rays_param.filter_rays_yaw_end = config.filter_rays_param.filter_rays_yaw_end;
       rays_param.rays_param.filter_rays_pitch_start = config.filter_rays_param.filter_rays_pitch_start;
       rays_param.rays_param.filter_rays_pitch_end = config.filter_rays_param.filter_rays_pitch_end;
+
+#ifdef BUILDING_ROS1
       auto rotation = GetTransformation(config.filter_rays_param.filter_rays_frame_id, config.frame_id);
+#elif defined BUILDING_ROS2
+      auto rotation = GetTransformation(config.filter_rays_param.filter_rays_frame_id, config.frame_id, ros_clock);
+#endif
+
       if (rotation)
       {
         rays_param.transform.roll = std::get<0>(*rotation);
@@ -264,7 +297,7 @@ int LdsLidar::DeInitLdsLidar(void) {
 
 void LdsLidar::PrepareExit(void) { DeInitLdsLidar(); }
 
-std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const std::string target_frame, const std::string source_frame)
+std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const std::string target_frame, const std::string source_frame, rclcpp::Clock::SharedPtr ros_clock)
 {
 #ifdef BUILDING_ROS1
   tf2_ros::Buffer buffer_;
@@ -289,8 +322,31 @@ std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const
   double roll, pitch, yaw;
   tf2::getEulerYPR(transform.transform.rotation, yaw, pitch, roll);
   return std::tuple(static_cast<float>(roll), static_cast<float>(pitch), static_cast<float>(yaw));
+
 #elif defined BUILDING_ROS2
-  return std::tuple(static_cast<float>(0.0), static_cast<float>(0.0), static_cast<float>(0.0));
+  tf2_ros::Buffer buffer_(ros_clock);
+  tf2_ros::TransformListener listener_{buffer_};
+
+  std::string suppressed_error_string;
+  constexpr double transform_timeout {2.0};
+  if(!buffer_.canTransform(target_frame, source_frame, rclcpp::Time(0), rclcpp::Duration::from_seconds(transform_timeout), &suppressed_error_string))
+  {
+    std::cout << "Timout wait for Transformation:" << target_frame << " " << source_frame << std::endl;
+    return std::nullopt;
+  }
+  geometry_msgs::msg::TransformStamped transform;
+  try
+  {
+    transform = buffer_.lookupTransform(target_frame, source_frame, rclcpp::Time(0));
+  }
+  catch (const tf2::TransformException& e)
+  {
+    std::cout << "TransformException: " << e.what() << std::endl;
+    return std::nullopt;
+  }
+  double roll, pitch, yaw;
+  tf2::getEulerYPR(transform.transform.rotation, yaw, pitch, roll);
+  return std::tuple(static_cast<float>(roll), static_cast<float>(pitch), static_cast<float>(yaw));
 #endif
 }
 }  // namespace livox_ros

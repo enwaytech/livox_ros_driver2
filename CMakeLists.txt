@@ -303,12 +303,18 @@ find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(enway_msgs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
+find_package(dust_filter_livox REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+
 #---------------------------------------------------------------------------------------
 # livox_sdk2
 #---------------------------------------------------------------------------------------
 add_subdirectory(src/livox_sdk2)
 find_package(livox_sdk2 REQUIRED)
-find_package(dust_filter_livox REQUIRED)
+
+
 ament_auto_find_build_dependencies()
 
 # check apr
@@ -328,10 +334,7 @@ rosidl_generate_interfaces(${LIVOX_INTERFACES}
   LIBRARY_NAME ${PROJECT_NAME}
 )
 
-## make sure the livox_lidar_sdk_shared library is installed
-##find_library(LIVOX_LIDAR_SDK_LIBRARY liblivox_lidar_sdk_shared.so /usr/local/lib REQUIRED)
-
-##
+## Lidar SDK
 find_path(LIVOX_LIDAR_SDK_INCLUDE_DIR
   NAMES "livox_lidar_api.h" "livox_lidar_def.h"
   REQUIRED)
@@ -366,19 +369,15 @@ ament_auto_add_library(${PROJECT_NAME} SHARED
 target_include_directories(${PROJECT_NAME} PRIVATE ${livox_sdk_INCLUDE_DIRS})
 
 # get include directories of custom msg headers
-#if(HUMBLE_ROS STREQUAL "humble")
-rosidl_get_typesupport_target(cpp_typesupport_target
-${LIVOX_INTERFACES} "rosidl_typesupport_cpp")
-target_link_libraries(${PROJECT_NAME} "${cpp_typesupport_target}")
-
-#else()
-#  set(LIVOX_INTERFACE_TARGET "${LIVOX_INTERFACES}__rosidl_typesupport_cpp")
-# add_dependencies(${PROJECT_NAME} ${LIVOX_INTERFACES})
-#  get_target_property(LIVOX_INTERFACES_INCLUDE_DIRECTORIES ${LIVOX_INTERFACE_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
-#endif()
-
-
-message(ERROR ${LIVOX_INTERFACES_INCLUDE_DIRECTORIES})
+if(HUMBLE_ROS STREQUAL "humble")
+  rosidl_get_typesupport_target(cpp_typesupport_target
+  ${LIVOX_INTERFACES} "rosidl_typesupport_cpp")
+  target_link_libraries(${PROJECT_NAME} "${cpp_typesupport_target}")
+else()
+  set(LIVOX_INTERFACE_TARGET "${LIVOX_INTERFACES}__rosidl_typesupport_cpp")
+ add_dependencies(${PROJECT_NAME} ${LIVOX_INTERFACES})
+  get_target_property(LIVOX_INTERFACES_INCLUDE_DIRECTORIES ${LIVOX_INTERFACE_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
+endif()
 
 # include file direcotry
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -389,8 +388,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   3rdparty
   src
 )
-
-#rosidl_target_interfaces(cpp_typesupport_target ${LIVOX_INTERFACES} "rosidl_typesupport_cpp")
 
 # link libraries
 target_link_libraries(${PROJECT_NAME}

@@ -161,7 +161,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
   this->declare_parameter("angular_velocity_covariance", std::vector<double>(9, -1));
   this->declare_parameter("linear_acceleration_covariance", std::vector<double>(9, -1));
   this->declare_parameter("enable_dust_filter", false);
-  
+
   this->get_parameter("xfer_format", xfer_format);
   this->get_parameter("multi_topic", multi_topic);
   this->get_parameter("data_src", data_src);
@@ -171,15 +171,6 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
   this->get_parameter("angular_velocity_covariance", angular_velocity_covariance);
   this->get_parameter("linear_acceleration_covariance", linear_acceleration_covariance);
   this->get_parameter("enable_dust_filter", dust_filter);
-
-  if (dust_filter)
-  {
-    DRIVER_INFO(*this, "Dust filter is ON");
-  }
-  else
-  {
-    DRIVER_INFO(*this, "Dust filter is OFF");
-  }
 
   if (publish_freq > 100.0) {
     publish_freq = 100.0;
@@ -209,7 +200,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
     LdsLidar *read_lidar = LdsLidar::GetInstance(publish_freq);
     lddc_ptr_->RegisterLds(static_cast<Lds *>(read_lidar));
 
-    if ((read_lidar->InitLdsLidar(user_config_path))) {
+    if ((read_lidar->InitLdsLidar(user_config_path, this->get_clock()))) {
       DRIVER_INFO(*this, "Init lds lidar success!");
     } else {
       DRIVER_ERROR(*this, "Init lds lidar fail!");

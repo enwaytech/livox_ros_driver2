@@ -51,6 +51,7 @@ typedef enum {
   kLivoxCustomMsg = 1,
   kPclPxyziMsg = 2,
   kLivoxImuMsg = 3,
+  kErrorArrayMsg = 4,
 } TransferType;
 
 /** Type-Definitions based on ROS versions */
@@ -62,7 +63,14 @@ using PointField = sensor_msgs::PointField;
 using CustomMsg = livox_ros_driver2::CustomMsg;
 using CustomPoint = livox_ros_driver2::CustomPoint;
 using ImuMsg = sensor_msgs::Imu;
+using ErrorArrayMsg = enway_msgs::ErrorArray;
 using ErrorGeneric = enway_msgs::ErrorGeneric;
+
+// Suppress `delete-non-virtual-dtor` warning by using final class, as diagnostic_updater::Updater does not have a virtual
+// destructor and is not marked as final. Otherwise calling delete Updater* generates a compilation warning.
+struct DiagnosticUpdaterFinal final : diagnostic_updater::Updater {};
+using DiagnosticUpdaterFinalPtr = DiagnosticUpdaterFinal*;
+
 #elif defined BUILDING_ROS2
 template <typename MessageT> using Publisher = rclcpp::Publisher<MessageT>;
 using PublisherPtr = std::shared_ptr<rclcpp::PublisherBase>;
@@ -71,13 +79,11 @@ using PointField = sensor_msgs::msg::PointField;
 using CustomMsg = livox_ros_driver2::msg::CustomMsg;
 using CustomPoint = livox_ros_driver2::msg::CustomPoint;
 using ImuMsg = sensor_msgs::msg::Imu;
+using ErrorArrayMsg = enway_msgs::msg::ErrorArray;
 using ErrorGeneric = enway_msgs::msg::ErrorGeneric;
+using DiagnosticUpdaterFinal = diagnostic_updater::Updater;
+using DiagnosticUpdaterFinalPtr = diagnostic_updater::Updater*;
 #endif
-
-// Suppress `delete-non-virtual-dtor` warning by using final class, as diagnostic_updater::Updater does not have a virtual
-// destructor and is not marked as final. Otherwise calling delete Updater* generates a compilation warning.
-struct DiagnosticUpdaterFinal : diagnostic_updater::Updater {}; //
-using DiagnosticUpdaterFinalPtr = DiagnosticUpdaterFinal*;
 
 using PointCloud = pcl::PointCloud<pcl::PointXYZI>;
 
