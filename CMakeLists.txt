@@ -334,11 +334,6 @@ rosidl_generate_interfaces(${LIVOX_INTERFACES}
   LIBRARY_NAME ${PROJECT_NAME}
 )
 
-## Lidar SDK
-find_path(LIVOX_LIDAR_SDK_INCLUDE_DIR
-  NAMES "livox_lidar_api.h" "livox_lidar_def.h"
-  REQUIRED)
-
 ## PCL library
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
@@ -377,7 +372,6 @@ target_link_libraries(${PROJECT_NAME} "${cpp_typesupport_target}")
 target_include_directories(${PROJECT_NAME} PUBLIC
   ${PCL_INCLUDE_DIRS}
   ${APR_INCLUDE_DIRS}
-  ${LIVOX_LIDAR_SDK_INCLUDE_DIR}
   ${LIVOX_INTERFACES_INCLUDE_DIRECTORIES}   # for custom msgs
   3rdparty
   src
