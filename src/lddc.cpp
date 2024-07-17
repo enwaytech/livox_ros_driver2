@@ -41,9 +41,12 @@
 #include "lds_lidar.h"
 
 #include <pcl_conversions/pcl_conversions.h>
+#include <rmw/qos_profiles.h>
 
 #include <enway_msgs/msg/error_array.hpp>
 #include <enway_msgs/msg/error_generic.hpp>
+
+
 
 namespace livox_ros
 {
@@ -947,8 +950,8 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
     std::string &topic_name, uint32_t queue_size) {
     if (kPointCloud2Msg == msg_type) {
       DRIVER_INFO(*cur_node_,
-          "%s publish use PointCloud2 format", topic_name.c_str());
-      return cur_node_->create_publisher<PointCloud2>(topic_name, queue_size);
+          "%s publish use PointCloud2 format with sensor QoS", topic_name.c_str());
+      return cur_node_->create_publisher<PointCloud2>(topic_name, rclcpp::SensorDataQoS());
     } else if (kLivoxCustomMsg == msg_type) {
       DRIVER_INFO(*cur_node_,
           "%s publish use livox custom format", topic_name.c_str());
