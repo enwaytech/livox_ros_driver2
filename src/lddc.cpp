@@ -1128,7 +1128,7 @@ PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
 
     *pub = new ros::Publisher;
     **pub = cur_node_->GetNode().advertise<sensor_msgs::PointCloud2>(name_str, queue_size);
-    DRIVER_INFO(*cur_node_, "%s publish invalid point data, set ROS publisher queue size %d", name_str,
+    DRIVER_INFO(*cur_node_, "%s publish non-return rays data, set ROS publisher queue size %d", name_str,
              queue_size);
   }
 
@@ -1223,6 +1223,31 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentPublisher(uint8_t handle)
       global_pub_ = CreatePublisher(transfer_format_, topic_name, queue_size);
     }
     return global_pub_;
+  }
+}
+
+std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
+  uint32_t queue_size = kMinEthPacketQueueSize;
+  if (use_multi_topic_) {
+    if (!private_non_return_rays_pub_[handle]) {
+      char name_str[48];
+      memset(name_str, 0, sizeof(name_str));
+
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/non_return_rays_%s",
+          ReplacePeriodByUnderline(ip_string).c_str());
+      std::string topic_name(name_str);
+      queue_size = queue_size * 2; // queue size is 64 for only one lidar
+      private_non_return_rays_pub_[handle] = CreatePublisher(transfer_format_, topic_name, queue_size);
+    }
+    return private_non_return_rays_pub_[handle];
+  } else {
+    if (!global_non_return_rays_pub_) {
+      std::string topic_name("livox/non_return_rays");
+      queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+      global_non_return_rays_pub_ = CreatePublisher(transfer_format_, topic_name, queue_size);
+    }
+    return global_non_return_rays_pub_;
   }
 }
 
