@@ -98,7 +98,7 @@ class Lddc final {
 #elif defined BUILDING_ROS2
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string &frame_id,
        const std::vector<double>& angular_velocity_covariance,
-       const std::vector<double>& linear_acceleration_covariance, bool dust_filter);
+       const std::vector<double>& linear_acceleration_covariance, bool dust_filter, bool pub_non_return_rays);
 #endif
   ~Lddc();
 

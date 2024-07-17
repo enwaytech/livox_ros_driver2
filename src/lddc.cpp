@@ -101,7 +101,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
 #elif defined BUILDING_ROS2
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string& frame_id, 
            const std::vector<double>& angular_velocity_covariance,
-           const std::vector<double>& linear_acceleration_covariance, bool dust_filter)
+           const std::vector<double>& linear_acceleration_covariance, bool dust_filter, bool pub_non_return_rays)
   : transfer_format_(format)
   , use_multi_topic_(multi_topic)
   , data_src_(data_src)
@@ -110,6 +110,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   , frame_id_(frame_id)
   , angular_velocity_covariance_(angular_velocity_covariance)
   , linear_acceleration_covariance_(linear_acceleration_covariance)
+  , pub_non_return_rays_(pub_non_return_rays)
 {
   std::cout << "Transfer format: " << format << std::endl;
   publish_period_ns_ = kNsPerSecond / publish_frq_;
@@ -1094,8 +1095,7 @@ PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
 
     *pub = new ros::Publisher;
     **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorArray>(name_str, queue_size);
-    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
-             queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str, queue_size);
   }
 
   return *pub;
