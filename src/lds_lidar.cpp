@@ -165,12 +165,6 @@ bool LdsLidar::InitLivoxLidar(rclcpp::Clock::SharedPtr ros_clock) {
     return false;
   }
 
-  // SDK initialization
-  if (!LivoxLidarSdkInit(path_.c_str())) {
-    std::cout << "Failed to init livox lidar sdk." << std::endl;
-    return false;
-  }
-
   // fill in lidar devices
   for (auto& config : user_configs) {
     uint8_t index = 0;
@@ -261,7 +255,12 @@ bool LdsLidar::InitLivoxLidar(rclcpp::Clock::SharedPtr ros_clock) {
         throw std::runtime_error("Failed to lookup transformation between " + config.frame_id + " and " + config.filter_rays_param.filter_rays_frame_id);
       }
     }
+  }
 
+  // SDK initialization
+  if (!LivoxLidarSdkInit(path_.c_str())) {
+    std::cout << "Failed to init livox lidar sdk." << std::endl;
+    return false;
   }
 
   SetLivoxLidarInfoChangeCallback(LivoxLidarCallback::LidarInfoChangeCallback, g_lds_ldiar);
@@ -328,7 +327,7 @@ std::optional<std::tuple<float, float, float>> LdsLidar::GetTransformation(const
   tf2_ros::TransformListener listener_{buffer_};
 
   std::string suppressed_error_string;
-  constexpr double transform_timeout {2.0};
+  constexpr double transform_timeout {5.0};
   if(!buffer_.canTransform(target_frame, source_frame, rclcpp::Time(0), rclcpp::Duration::from_seconds(transform_timeout), &suppressed_error_string))
   {
     std::cout << "Timout wait for Transformation:" << target_frame << " " << source_frame << std::endl;
