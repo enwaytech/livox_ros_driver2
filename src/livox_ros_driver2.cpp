@@ -146,6 +146,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
   int output_type = kOutputToRos;
   std::string frame_id;
   bool dust_filter = false;
+  bool publish_non_return_rays = false;
   std::vector<double> angular_velocity_covariance;
   std::vector<double> linear_acceleration_covariance;
 
@@ -161,6 +162,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
   this->declare_parameter("angular_velocity_covariance", std::vector<double>(9, -1));
   this->declare_parameter("linear_acceleration_covariance", std::vector<double>(9, -1));
   this->declare_parameter("enable_dust_filter", false);
+  this->declare_parameter("publish_non_return_rays", false);
 
   this->get_parameter("xfer_format", xfer_format);
   this->get_parameter("multi_topic", multi_topic);
@@ -171,7 +173,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
   this->get_parameter("angular_velocity_covariance", angular_velocity_covariance);
   this->get_parameter("linear_acceleration_covariance", linear_acceleration_covariance);
   this->get_parameter("enable_dust_filter", dust_filter);
-
+  this->get_parameter("publish_non_return_rays", publish_non_return_rays);
   if (publish_freq > 100.0) {
     publish_freq = 100.0;
   } else if (publish_freq < 0.5) {
@@ -184,7 +186,7 @@ DriverNode::DriverNode(const rclcpp::NodeOptions & node_options)
 
   /** Lidar data distribute control and lidar data source set */
   lddc_ptr_ = std::make_unique<Lddc>(xfer_format, multi_topic, data_src, output_type, publish_freq, frame_id, 
-                                     angular_velocity_covariance, linear_acceleration_covariance, dust_filter);
+                                     angular_velocity_covariance, linear_acceleration_covariance, dust_filter, publish_non_return_rays);
   lddc_ptr_->SetRosNode(this);
 
   if (data_src == kSourceRawLidar) {

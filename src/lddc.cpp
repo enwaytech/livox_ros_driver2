@@ -41,9 +41,12 @@
 #include "lds_lidar.h"
 
 #include <pcl_conversions/pcl_conversions.h>
+#include <rmw/qos_profiles.h>
 
 #include <enway_msgs/msg/error_array.hpp>
 #include <enway_msgs/msg/error_generic.hpp>
+
+
 
 namespace livox_ros
 {
@@ -98,7 +101,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
 #elif defined BUILDING_ROS2
 Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double frq, std::string& frame_id, 
            const std::vector<double>& angular_velocity_covariance,
-           const std::vector<double>& linear_acceleration_covariance, bool dust_filter)
+           const std::vector<double>& linear_acceleration_covariance, bool dust_filter, bool pub_non_return_rays)
   : transfer_format_(format)
   , use_multi_topic_(multi_topic)
   , data_src_(data_src)
@@ -107,6 +110,7 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type, double fr
   , frame_id_(frame_id)
   , angular_velocity_covariance_(angular_velocity_covariance)
   , linear_acceleration_covariance_(linear_acceleration_covariance)
+  , pub_non_return_rays_(pub_non_return_rays)
 {
   std::cout << "Transfer format: " << format << std::endl;
   publish_period_ns_ = kNsPerSecond / publish_frq_;
@@ -947,8 +951,8 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
     std::string &topic_name, uint32_t queue_size) {
     if (kPointCloud2Msg == msg_type) {
       DRIVER_INFO(*cur_node_,
-          "%s publish use PointCloud2 format", topic_name.c_str());
-      return cur_node_->create_publisher<PointCloud2>(topic_name, queue_size);
+          "%s publish use PointCloud2 format with sensor QoS", topic_name.c_str());
+      return cur_node_->create_publisher<PointCloud2>(topic_name, rclcpp::SensorDataQoS());
     } else if (kLivoxCustomMsg == msg_type) {
       DRIVER_INFO(*cur_node_,
           "%s publish use livox custom format", topic_name.c_str());
@@ -1091,8 +1095,7 @@ PublisherPtr Lddc::GetCurrentErrorPublisher(uint8_t handle) {
 
     *pub = new ros::Publisher;
     **pub = cur_node_->GetNode().advertise<enway_msgs::ErrorArray>(name_str, queue_size);
-    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str,
-             queue_size);
+    DRIVER_INFO(*cur_node_, "%s publish error data, set ROS publisher queue size %d", name_str, queue_size);
   }
 
   return *pub;
@@ -1125,7 +1128,7 @@ PublisherPtr Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
 
     *pub = new ros::Publisher;
     **pub = cur_node_->GetNode().advertise<sensor_msgs::PointCloud2>(name_str, queue_size);
-    DRIVER_INFO(*cur_node_, "%s publish invalid point data, set ROS publisher queue size %d", name_str,
+    DRIVER_INFO(*cur_node_, "%s publish non-return rays data, set ROS publisher queue size %d", name_str,
              queue_size);
   }
 
@@ -1220,6 +1223,31 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentPublisher(uint8_t handle)
       global_pub_ = CreatePublisher(transfer_format_, topic_name, queue_size);
     }
     return global_pub_;
+  }
+}
+
+std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentNonReturnRaysPublisher(uint8_t handle) {
+  uint32_t queue_size = kMinEthPacketQueueSize;
+  if (use_multi_topic_) {
+    if (!private_non_return_rays_pub_[handle]) {
+      char name_str[48];
+      memset(name_str, 0, sizeof(name_str));
+
+      std::string ip_string = IpNumToString(lds_->lidars_[handle].handle);
+      snprintf(name_str, sizeof(name_str), "livox/non_return_rays_%s",
+          ReplacePeriodByUnderline(ip_string).c_str());
+      std::string topic_name(name_str);
+      queue_size = queue_size * 2; // queue size is 64 for only one lidar
+      private_non_return_rays_pub_[handle] = CreatePublisher(transfer_format_, topic_name, queue_size);
+    }
+    return private_non_return_rays_pub_[handle];
+  } else {
+    if (!global_non_return_rays_pub_) {
+      std::string topic_name("livox/non_return_rays");
+      queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+      global_non_return_rays_pub_ = CreatePublisher(transfer_format_, topic_name, queue_size);
+    }
+    return global_non_return_rays_pub_;
   }
 }
 

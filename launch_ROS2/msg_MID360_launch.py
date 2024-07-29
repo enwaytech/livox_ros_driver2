@@ -14,6 +14,7 @@ frame_id      = 'livox_frame'
 lvx_file_path = '/home/livox/livox_test.lvx'
 cmdline_bd_code = 'livox0000000001'
 enable_dust_filter = True
+publish_non_return_rays = True
 
 cur_path = os.path.split(os.path.realpath(__file__))[0] + '/'
 cur_config_path = cur_path + '../config'
@@ -30,7 +31,8 @@ livox_ros2_params = [
     {"lvx_file_path": lvx_file_path},
     {"user_config_path": user_config_path},
     {"cmdline_input_bd_code": cmdline_bd_code},
-    {"enable_dust_filter": enable_dust_filter}
+    {"enable_dust_filter": enable_dust_filter},
+    {"publish_non_return_rays": publish_non_return_rays}
 ]
 
 
