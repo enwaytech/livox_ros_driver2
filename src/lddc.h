@@ -32,6 +32,7 @@
 
 #include <optional>
 #include <string>
+#include <memory>
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 
@@ -131,13 +132,13 @@ class Lddc final {
   void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, const std::string& lidar_frame_id);
   void PublishStateInfoData(LidarStateInfoQueue& state_info_data_queue, const uint8_t index, const std::string& lidar_frame_id);
 
-  void InitPointcloud2MsgHeader(PointCloud2& cloud, const std::string& frame_id);
-  void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
-  void PublishPointcloud2Data(const uint8_t index, uint64_t timestamp, const PointCloud2& cloud);
+  void InitPointcloud2MsgHeader(std::unique_ptr<PointCloud2>& cloud, const std::string& frame_id);
+  void InitPointcloud2Msg(const StoragePacket& pkg, std::unique_ptr<PointCloud2>& cloud, uint64_t& timestamp, const std::string& frame_id);
+  void PublishPointcloud2Data(const uint8_t index, uint64_t timestamp, std::unique_ptr<PointCloud2> cloud);
 
-  void InitPointcloud2NonReturnRaysMsgHeader(PointCloud2& cloud, const std::string& frame_id);
-  void InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp, const std::string& frame_id);
-  void PublishPointcloud2NonReturnRaysData(const uint8_t index, uint64_t timestamp, const PointCloud2& cloud);
+  void InitPointcloud2NonReturnRaysMsgHeader(std::unique_ptr<PointCloud2>& cloud, const std::string& frame_id);
+  void InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, std::unique_ptr<PointCloud2>& cloud, uint64_t& timestamp, const std::string& frame_id);
+  void PublishPointcloud2NonReturnRaysData(const uint8_t index, uint64_t timestamp, std::unique_ptr<PointCloud2> cloud);
 
   void InitCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg, uint8_t index, const std::string& frame_id);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg);
