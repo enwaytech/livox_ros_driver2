@@ -486,7 +486,7 @@ void Lddc::PublishPclMsg(LidarDataQueue *queue, uint8_t index, const std::string
   return;
 }
 
-void Lddc::InitPointcloud2MsgHeader(std::unique_ptr<PointCloud2>& cloud, const std::string& frame_id) {
+void Lddc::InitPointcloud2MsgHeader(const std::unique_ptr<PointCloud2>& cloud, const std::string& frame_id) {
   cloud->header.frame_id.assign(frame_id);
   cloud->height = 1;
   cloud->width = 0;
@@ -522,7 +522,7 @@ void Lddc::InitPointcloud2MsgHeader(std::unique_ptr<PointCloud2>& cloud, const s
   cloud->point_step = sizeof(LivoxPointXyzrtlt);
 }
 
-void Lddc::InitPointcloud2Msg(const StoragePacket& pkg, std::unique_ptr<PointCloud2>& cloud, uint64_t& timestamp, const std::string& frame_id) {
+void Lddc::InitPointcloud2Msg(const StoragePacket& pkg, const std::unique_ptr<PointCloud2>& cloud, uint64_t& timestamp, const std::string& frame_id) {
   InitPointcloud2MsgHeader(cloud, frame_id);
 
   cloud->point_step = sizeof(LivoxPointXyzrtlt);
@@ -559,7 +559,7 @@ void Lddc::InitPointcloud2Msg(const StoragePacket& pkg, std::unique_ptr<PointClo
   memcpy(cloud->data.data(), points.data(), pkg.points_num * sizeof(LivoxPointXyzrtlt));
 }
 
-void Lddc::InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, std::unique_ptr<PointCloud2>& cloud, uint64_t& timestamp, const std::string& frame_id) {
+void Lddc::InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, const std::unique_ptr<PointCloud2>& cloud, uint64_t& timestamp, const std::string& frame_id) {
   InitPointcloud2NonReturnRaysMsgHeader(cloud, frame_id);
 
   cloud->point_step = sizeof(LivoxPointRtp);
@@ -603,7 +603,7 @@ void Lddc::InitPointcloud2NonReturnRaysMsg(const StoragePacket& pkg, std::unique
   memcpy(cloud->data.data(), rays.data(), rays.size() * sizeof(LivoxPointRtp));
 }
 
-void Lddc::InitPointcloud2NonReturnRaysMsgHeader(std::unique_ptr<PointCloud2>& cloud, const std::string& frame_id) {
+void Lddc::InitPointcloud2NonReturnRaysMsgHeader(const std::unique_ptr<PointCloud2>& cloud, const std::string& frame_id) {
   cloud->header.frame_id.assign(frame_id);
   cloud->height = 1;
   cloud->width = 0;
@@ -952,7 +952,7 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
     if (kPointCloud2Msg == msg_type) {
       DRIVER_INFO(*cur_node_,
           "%s publish use PointCloud2 format with sensor QoS", topic_name.c_str());
-      return cur_node_->create_publisher<PointCloud2>(topic_name, rclcpp::SensorDataQoS());
+      return cur_node_->create_publisher<PointCloud2>(topic_name, rclcpp::SensorDataQoS().keep_last(1));
     } else if (kLivoxCustomMsg == msg_type) {
       DRIVER_INFO(*cur_node_,
           "%s publish use livox custom format", topic_name.c_str());
